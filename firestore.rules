@@ -1,0 +1,32 @@
+rules_version = '2';
+
+// ============================================================================
+// REGLAS ACTUALES DEL PROTOTIPO (elegidas por José para poder probar ya
+// mismo, sin pantalla de login): cualquiera con la URL/proyecto puede leer y
+// escribir. Úsalas solo mientras el proyecto es privado / de pruebas.
+//
+// ANTES de compartir la app fuera del equipo (GitHub Pages público, enviarla
+// a gerencia, etc.) cambia a la opción segura más abajo (auth anónima) —
+// basta con activar "Anonymous" en Firebase Authentication y reemplazar el
+// bloque de abajo por el que está comentado.
+// ============================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
+
+// ----------------------------------------------------------------------------
+// OPCIÓN SEGURA PARA CUANDO PASES A PRODUCCIÓN (requiere activar Firebase
+// Authentication -> Anonymous, y que el cliente haga signInAnonymously()):
+//
+// service cloud.firestore {
+//   match /databases/{database}/documents {
+//     match /lecturas/{doc} {
+//       allow read, write: if request.auth != null;
+//     }
+//   }
+// }
+// ----------------------------------------------------------------------------

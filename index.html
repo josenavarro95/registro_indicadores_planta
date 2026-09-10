@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Monitoreo Integral — Planta Valdivia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<div id="toast-container" class="toast-container"></div>
+<div id="banner-config" class="banner-config" hidden>
+  ⚠ Esta app todavía no está conectada a tu proyecto real de Firebase (faltan tus credenciales en
+  <code>js/firebase-config.js</code>) — por eso no puede cargar ni guardar horas. Sigue el paso 1 del
+  <code>README.md</code> y recarga la página.
+</div>
+
+<header class="topbar">
+  <div class="topbar__brand">
+    <span class="topbar__dot"></span>
+    <div>
+      <h1>Sistema de Monitoreo Integral de Servicios Generales y Energía</h1>
+      <p>Planta Valdivia, Santa Elena · Red 220V / 3Φ</p>
+    </div>
+  </div>
+  <nav class="tabs">
+    <button class="tab tab--active" id="tab-registro" data-target="vista-registro">Registro de Lectura</button>
+    <button class="tab" id="tab-dashboard" data-target="vista-dashboard">Dashboard Gerencial</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ==================== VISTA: REGISTRO ==================== -->
+  <section id="vista-registro" class="vista vista--activa">
+    <div class="grid-registro">
+      <form id="form-registro" class="card card--form">
+        <div class="card__header">
+          <h2>Registro horario</h2>
+          <span id="badge-turno" class="badge">—</span>
+        </div>
+
+        <div class="field-row field-row--fecha">
+          <label>Día que se está registrando
+            <input type="date" id="input-fecha" required />
+          </label>
+          <span id="resumen-dia" class="muted small"></span>
+        </div>
+
+        <div class="horas-strip" id="horas-strip" aria-label="Horas del día"></div>
+        <p class="muted small">Toca una hora para cargarla. Verde = ya registrada · Azul = la que estás llenando ahora.</p>
+
+        <div class="field-row">
+          <label class="campo-hora-actual">Hora seleccionada
+            <input type="text" id="hora-actual" readonly tabindex="-1" />
+          </label>
+          <label>Estado
+            <select name="estado">
+              <option value="OK">OK</option>
+              <option value="PARADA">PARADA</option>
+              <option value="ALERTA">ALERTA</option>
+              <option value="MANTENIMIENTO">MANTENIMIENTO</option>
+            </select>
+          </label>
+        </div>
+
+        <fieldset>
+          <legend>Energía eléctrica — corrientes por fase (A)</legend>
+          <div class="field-row">
+            <label>L1 <input type="number" step="any" name="corrienteL1" required /></label>
+            <label>L2 <input type="number" step="any" name="corrienteL2" required /></label>
+            <label>L3 <input type="number" step="any" name="corrienteL3" required /></label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Agua potable — cisterna</legend>
+          <div class="field-row">
+            <label>Nivel cisterna (%)
+              <input type="number" step="any" min="0" max="100" name="nivelCisternaPct" required />
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>GLP — presión de campo por tanque (PSI)</legend>
+          <div class="field-row field-row--glp">
+            <label>Tanque 1 <input type="number" step="any" name="glp1" required /></label>
+            <label>Tanque 2 <input type="number" step="any" name="glp2" required /></label>
+            <label>Tanque 3 <input type="number" step="any" name="glp3" required /></label>
+            <label>Tanque 4 <input type="number" step="any" name="glp4" required /></label>
+            <label>Tanque 5 <input type="number" step="any" name="glp5" required /></label>
+            <label>Tanque 6 <input type="number" step="any" name="glp6" required /></label>
+          </div>
+        </fieldset>
+
+        <div class="field-row">
+          <label>Operador (opcional)
+            <input type="text" name="operador" placeholder="Nombre de quien registra" />
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn--primary" id="btn-guardar">Guardar y pasar a la siguiente hora →</button>
+        </div>
+        <p class="muted small">Tip: presiona <kbd>Enter</kbd> después de cada valor para saltar al siguiente campo sin usar el mouse.</p>
+        <p id="info-parametros" class="muted small"></p>
+        <button type="button" id="btn-cargar-excel" class="btn-link">Cargar datos de referencia del Excel (una vez, opcional)</button>
+      </form>
+
+      <aside class="card card--panel">
+        <h2>Lectura anterior</h2>
+        <div id="panel-anterior">
+          <p class="muted">Selecciona fecha y hora para comparar.</p>
+        </div>
+        <hr />
+        <h3>Parámetros técnicos</h3>
+        <ul class="lista-parametros">
+          <li>Cisterna: 1.9 × 4.3 × 6.7 m (≈55 m³ nominal)</li>
+          <li>Tanque GLP: 7 500 L / 4 050 kg c/u — 6 tanques</li>
+          <li>Red: 220 V trifásica, cos φ = 0.85</li>
+          <li>Conversión: 1 PSI = 0.070307 kg/cm²</li>
+        </ul>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ==================== VISTA: DASHBOARD ==================== -->
+  <section id="vista-dashboard" class="vista">
+    <div class="dashboard-toolbar">
+      <label>Desde <input type="date" id="input-desde" /></label>
+      <label>Hasta <input type="date" id="input-hasta" /></label>
+      <button id="btn-actualizar-dashboard" class="btn btn--primary">Actualizar</button>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <span class="kpi-card__label">Consumo total energía</span>
+        <span class="kpi-card__valor" id="kpi-energia">—</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-card__label">Demanda máxima de potencia</span>
+        <span class="kpi-card__valor" id="kpi-demanda">—</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-card__label">Consumo total de agua</span>
+        <span class="kpi-card__valor" id="kpi-agua">—</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-card__label">Consumo total de GLP (masa)</span>
+        <span class="kpi-card__valor" id="kpi-glp">—</span>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-card__header">
+        <h2>Energía eléctrica</h2>
+        <p class="muted">Potencia activa (kW) y energía consumida por hora (kWh), calculadas como P = √3·V·I<sub>prom</sub>·cosφ.</p>
+      </div>
+      <div class="chart-wrap"><canvas id="chart-energia"></canvas></div>
+      <p class="diagnostico" id="diag-energia"></p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-card__header">
+        <h2>Corrientes por fase y desbalance</h2>
+        <p class="muted">Corriente en cada línea (L1, L2, L3) y % de desbalance respecto al promedio (referencia NEMA MG1: &lt;15% recomendado).</p>
+      </div>
+      <div class="chart-wrap"><canvas id="chart-corrientes"></canvas></div>
+      <p class="diagnostico" id="diag-corrientes"></p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-card__header">
+        <h2>Agua potable — cisterna</h2>
+        <p class="muted">Nivel de llenado (%) de la cisterna de 1.9×4.3×6.7 m (≈55 m³), con umbral de alerta por nivel bajo.</p>
+      </div>
+      <div class="chart-wrap"><canvas id="chart-agua"></canvas></div>
+      <p class="diagnostico" id="diag-agua"></p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-card__header">
+        <h2>GLP — banco de 6 tanques</h2>
+        <p class="muted">Nivel total del banco (%) y detalle individual por tanque, con umbral de alerta y autonomía estimada.</p>
+      </div>
+      <div class="chart-wrap"><canvas id="chart-glp-total"></canvas></div>
+      <div class="chart-wrap"><canvas id="chart-glp-tanques"></canvas></div>
+      <p class="diagnostico" id="diag-glp"></p>
+      <p class="muted small" id="nota-glp-supuesto"></p>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <p>Prototipo — Electric &amp; Automation · Datos almacenados en Firebase Firestore · Ingreso manual (automatización prevista a futuro)</p>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script>
+  document.querySelectorAll(".tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach((b) => b.classList.remove("tab--active"));
+      document.querySelectorAll(".vista").forEach((v) => v.classList.remove("vista--activa"));
+      btn.classList.add("tab--active");
+      document.getElementById(btn.dataset.target).classList.add("vista--activa");
+    });
+  });
+</script>
+<script type="module" src="js/app.js"></script>
+<script type="module" src="js/dashboard.js"></script>
+</body>
+</html>
