@@ -152,6 +152,7 @@ function renderCorrientes(registros) {
   const desb = registros.map((r) => r.energia?.desbalancePct ?? null);
 
   dibujar("chart-corrientes", {
+    type: "line",
     data: {
       labels: etiquetas,
       datasets: [
@@ -192,6 +193,7 @@ function renderAgua(registros) {
   const umbral = PARAMETROS.cisterna.umbralBajoPct;
 
   dibujar("chart-agua", {
+    type: "line",
     data: {
       labels: etiquetas,
       datasets: [
@@ -224,6 +226,7 @@ function renderGlp(registros) {
   const umbral = PARAMETROS.glp.umbralBajoPct;
 
   dibujar("chart-glp-total", {
+    type: "line",
     data: {
       labels: etiquetas,
       datasets: [
@@ -236,6 +239,7 @@ function renderGlp(registros) {
 
   const coloresTanques = [PALETA.l1, PALETA.l2, PALETA.l3, PALETA.potencia, PALETA.glp, PALETA.agua];
   dibujar("chart-glp-tanques", {
+    type: "line",
     data: {
       labels: etiquetas,
       datasets: [1, 2, 3, 4, 5, 6].map((n, i) => ({
