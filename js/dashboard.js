@@ -70,7 +70,14 @@ function renderKPIs(registros) {
 // ---------------------------------------------------------------------------
 function dibujar(idCanvas, config) {
   const ctx = document.getElementById(idCanvas);
-  if (graficos[idCanvas]) graficos[idCanvas].destroy();
+  // Destruye cualquier gráfico previo en este canvas — tanto el que nosotros
+  // recordamos (graficos[idCanvas]) como cualquier otro que Chart.js ya tenga
+  // registrado internamente en ese mismo <canvas> (Chart.getChart). Esta doble
+  // verificación evita el error "Canvas is already in use" cuando dos llamadas
+  // a actualizarDashboard() se superponen (por ejemplo, al cambiar de pestaña
+  // justo cuando la carga inicial todavía no terminaba).
+  const existente = graficos[idCanvas] || Chart.getChart(ctx);
+  if (existente) existente.destroy();
   graficos[idCanvas] = new Chart(ctx, config);
 }
 
@@ -266,11 +273,15 @@ function renderGlp(registros) {
 // ---------------------------------------------------------------------------
 // Orquestación
 // ---------------------------------------------------------------------------
+let actualizando = false; // evita llamadas superpuestas (carga inicial + clic en pestaña + botón)
+
 async function actualizarDashboard() {
   const desde = inputDesde.value;
   const hasta = inputHasta.value;
   if (!desde || !hasta) return;
+  if (actualizando) return; // ya hay una actualización en curso, no dispares otra
 
+  actualizando = true;
   btnActualizar.disabled = true;
   try {
     const registros = await cargarRango(desde, hasta);
@@ -287,6 +298,7 @@ async function actualizarDashboard() {
     mostrarToast("Error al leer datos de Firebase: " + err.message, "error");
   } finally {
     btnActualizar.disabled = false;
+    actualizando = false;
   }
 }
 
