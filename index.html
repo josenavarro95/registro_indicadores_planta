@@ -69,14 +69,16 @@
           </label>
         </div>
 
+        <p class="muted small">Ningún campo de abajo es obligatorio: puedes guardar la hora aunque falten datos (por ejemplo, si todavía no tienes la potencia o los tanques de GLP) y completarlos después volviendo a esa misma hora.</p>
+
         <fieldset>
           <legend>Energía eléctrica</legend>
           <div class="field-row">
             <label>Potencia total (kW)
-              <input type="number" step="any" name="potenciaTotalKw" required />
+              <input type="number" step="any" name="potenciaTotalKw" />
             </label>
             <label>Energía suministrada — lectura acumulada (GWh)
-              <input type="number" step="any" name="energiaSuminGwh" required />
+              <input type="number" step="any" name="energiaSuminGwh" />
             </label>
           </div>
           <p class="muted small">La energía suministrada es la lectura del medidor totalizador (solo sube) — el consumo de la hora se calcula solo, como diferencia con la lectura anterior.</p>
@@ -86,44 +88,46 @@
           <legend>Agua potable — cisterna</legend>
           <div class="field-row">
             <label>Nivel cisterna (%)
-              <input type="number" step="any" min="0" max="100" name="nivelCisternaPct" required />
+              <input type="number" step="any" min="0" max="100" name="nivelCisternaPct" />
             </label>
           </div>
         </fieldset>
 
         <fieldset>
           <legend>Medidores de agua por área — lectura acumulada (m³)</legend>
-          <p class="muted small">Todos son totalizadores (como un medidor de agua normal): anota la cifra que marcan ahora mismo, el consumo de la hora se calcula solo.</p>
+          <p class="muted small">Todos son totalizadores (como un medidor de agua normal): anota la cifra que marcan ahora mismo, el consumo de la hora se calcula solo. Se muestran solo los medidores que ya se están registrando (M1, M3, M4, M5, M7, M8, M9, M16) — los demás (M0, M2, M6, M10-M15) quedan ocultos hasta que se pida activarlos.</p>
           <div class="field-row field-row--medidores">
-            <label>M0 · Entrada agua de pozo <input type="number" step="any" name="m0" required /></label>
-            <label>M1 · Agua producto ósmosis <input type="number" step="any" name="m1" required /></label>
-            <label>M2 · Rechazo de ósmosis <input type="number" step="any" name="m2" required /></label>
-            <label>M3 · Consumo de planta <input type="number" step="any" name="m3" required /></label>
-            <label>M4 · Baños y comedor <input type="number" step="any" name="m4" required /></label>
-            <label>M5 · PTARI y recepción de pesca <input type="number" step="any" name="m5" required /></label>
-            <label>M6 · Torre de enfriamiento <input type="number" step="any" name="m6" required /></label>
-            <label>M7 · Calderos <input type="number" step="any" name="m7" required /></label>
-            <label>M8 · Línea de atún <input type="number" step="any" name="m8" required /></label>
-            <label>M9 · Línea de sardinas <input type="number" step="any" name="m9" required /></label>
-            <label>M10 · Lavandería <input type="number" step="any" name="m10" required /></label>
-            <label>M11 · Descongelado de atún <input type="number" step="any" name="m11" required /></label>
-            <label>M12 · Recepción de atún (tolva de envasado) <input type="number" step="any" name="m12" required /></label>
-            <label>M13 · Retorno de agua de tanque reserva <input type="number" step="any" name="m13" required /></label>
-            <label>M14 · Descongelado de atún por recirculación <input type="number" step="any" name="m14" required /></label>
-            <label>M15 · Limpieza de pisos en general <input type="number" step="any" name="m15" required /></label>
-            <label>M16 · Administración <input type="number" step="any" name="m16" required /></label>
+            <!-- M0, M2, M6, M10-M15: aún no se registran, quedan ocultos con "hidden".
+                 Para reactivar un medidor, quita el atributo hidden de su <label>. -->
+            <label hidden>M0 · Entrada agua de pozo <input type="number" step="any" name="m0" /></label>
+            <label>M1 · Agua producto ósmosis <input type="number" step="any" name="m1" /></label>
+            <label hidden>M2 · Rechazo de ósmosis <input type="number" step="any" name="m2" /></label>
+            <label>M3 · Consumo de planta <input type="number" step="any" name="m3" /></label>
+            <label>M4 · Baños y comedor <input type="number" step="any" name="m4" /></label>
+            <label>M5 · PTARI y recepción de pesca <input type="number" step="any" name="m5" /></label>
+            <label hidden>M6 · Torre de enfriamiento <input type="number" step="any" name="m6" /></label>
+            <label>M7 · Calderos <input type="number" step="any" name="m7" /></label>
+            <label>M8 · Línea de atún <input type="number" step="any" name="m8" /></label>
+            <label>M9 · Línea de sardinas <input type="number" step="any" name="m9" /></label>
+            <label hidden>M10 · Lavandería <input type="number" step="any" name="m10" /></label>
+            <label hidden>M11 · Descongelado de atún <input type="number" step="any" name="m11" /></label>
+            <label hidden>M12 · Recepción de atún (tolva de envasado) <input type="number" step="any" name="m12" /></label>
+            <label hidden>M13 · Retorno de agua de tanque reserva <input type="number" step="any" name="m13" /></label>
+            <label hidden>M14 · Descongelado de atún por recirculación <input type="number" step="any" name="m14" /></label>
+            <label hidden>M15 · Limpieza de pisos en general <input type="number" step="any" name="m15" /></label>
+            <label>M16 · Administración <input type="number" step="any" name="m16" /></label>
           </div>
         </fieldset>
 
         <fieldset>
           <legend>GLP — presión de campo por tanque (PSI)</legend>
           <div class="field-row field-row--glp">
-            <label>Tanque 1 <input type="number" step="any" name="glp1" required /></label>
-            <label>Tanque 2 <input type="number" step="any" name="glp2" required /></label>
-            <label>Tanque 3 <input type="number" step="any" name="glp3" required /></label>
-            <label>Tanque 4 <input type="number" step="any" name="glp4" required /></label>
-            <label>Tanque 5 <input type="number" step="any" name="glp5" required /></label>
-            <label>Tanque 6 <input type="number" step="any" name="glp6" required /></label>
+            <label>Tanque 1 <input type="number" step="any" name="glp1" /></label>
+            <label>Tanque 2 <input type="number" step="any" name="glp2" /></label>
+            <label>Tanque 3 <input type="number" step="any" name="glp3" /></label>
+            <label>Tanque 4 <input type="number" step="any" name="glp4" /></label>
+            <label>Tanque 5 <input type="number" step="any" name="glp5" /></label>
+            <label>Tanque 6 <input type="number" step="any" name="glp6" /></label>
           </div>
         </fieldset>
 
@@ -151,7 +155,7 @@
           <li>Cisterna: 1.9 × 4.3 × 6.7 m (≈55 m³ nominal)</li>
           <li>Tanque GLP: 7 500 L / 4 050 kg c/u — 6 tanques</li>
           <li>Conversión: 1 PSI = 0.070307 kg/cm²</li>
-          <li>17 medidores de agua (M0-M16), todos totalizadores</li>
+          <li>17 medidores de agua definidos (M0-M16), todos totalizadores — 8 activos por ahora (M1, M3, M4, M5, M7, M8, M9, M16)</li>
         </ul>
       </aside>
     </div>

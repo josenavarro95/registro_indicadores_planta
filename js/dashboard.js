@@ -133,7 +133,9 @@ function renderEnergia(registros) {
   const st = estadistica(potencia);
   const ultimo = potencia[potencia.length - 1];
   let diag = "Sin datos suficientes para diagnóstico.";
-  if (potencia.length >= 2) {
+  if (ultimo === null || ultimo === undefined) {
+    diag = "Falta el dato de potencia de la última hora del periodo.";
+  } else if (potencia.length >= 2) {
     if (ultimo > st.media * 1.2) {
       diag = `⚠ Potencia actual (${fmt(ultimo)} kW) ${fmt(((ultimo / st.media - 1) * 100))}% por encima del promedio del periodo (${fmt(st.media)} kW). Revisar cargas conectadas.`;
     } else if (ultimo < st.media * 0.4 && st.media > 5) {
@@ -169,7 +171,9 @@ function renderAgua(registros) {
   const ultimoNivel = nivel[nivel.length - 1];
   const totalConsumo = registros.reduce((a, r) => a + Math.max(0, r.agua?.consumoM3 || 0), 0);
   let diag = "Sin datos suficientes para diagnóstico.";
-  if (nivel.length) {
+  if (ultimoNivel === null || ultimoNivel === undefined) {
+    diag = "Falta el dato de nivel de cisterna de la última hora del periodo.";
+  } else if (nivel.length) {
     diag =
       ultimoNivel < umbral
         ? `⚠ Nivel actual de cisterna en ${fmt(ultimoNivel)}% (${fmt(volumen[volumen.length - 1])} m³) — por debajo del umbral de ${umbral}%. Coordinar suministro/llenado.`
@@ -311,7 +315,9 @@ function renderGlp(registros) {
   const autonomiaDias = promedioConsumoHora > 0 ? ultimaMasa / (promedioConsumoHora * 24) : null;
 
   let diag = "Sin datos suficientes para diagnóstico.";
-  if (pctTotal.length) {
+  if (ultimoPct === null || ultimoPct === undefined) {
+    diag = "Falta el dato de GLP de la última hora del periodo.";
+  } else if (pctTotal.length) {
     const base =
       ultimoPct < umbral
         ? `⚠ Nivel del banco de GLP en ${fmt(ultimoPct)}% (${fmt(ultimaMasa, 0)} kg de ${fmt(PARAMETROS.glp.numTanques * PARAMETROS.glp.capacidadMasaKg, 0)} kg) — por debajo del umbral de ${umbral}%. Coordinar recarga.`

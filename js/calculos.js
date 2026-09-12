@@ -96,19 +96,25 @@ export function horasDelDia() {
 // lectura acumulada actual y la anterior (convertida de GWh a kWh), lo que
 // permite verificar la potencia real consumida hora a hora contra la
 // demanda instantánea reportada.
+function numOrNull(v) {
+  return v === null || v === undefined || v === "" || Number.isNaN(Number(v)) ? null : Number(v);
+}
+
 export function calcularEnergia({ potenciaTotalKw, energiaSuminGwh }, anterior) {
-  const potencia = Number(potenciaTotalKw) || 0;
-  const acumuladoGwh = Number(energiaSuminGwh) || 0;
+  const potencia = numOrNull(potenciaTotalKw);
+  const acumuladoGwh = numOrNull(energiaSuminGwh);
 
   let energiaConsumidaKwh = null;
-  if (anterior && typeof anterior.energia?.energiaSuminGwh === "number") {
+  if (acumuladoGwh !== null && anterior && typeof anterior.energia?.energiaSuminGwh === "number") {
     const deltaGwh = acumuladoGwh - anterior.energia.energiaSuminGwh;
     energiaConsumidaKwh = round2(deltaGwh * 1_000_000); // 1 GWh = 1,000,000 kWh
   }
 
   return {
-    potenciaTotalKw: round2(potencia),
-    energiaSuminGwh: round6(acumuladoGwh), // GWh necesita varios decimales: 1 kWh = 0.000001 GWh
+    // Si el campo se dejó vacío esta hora, queda null (sin dato) — no 0, para
+    // no falsear demandas máximas ni promedios en el dashboard.
+    potenciaTotalKw: potencia === null ? null : round2(potencia),
+    energiaSuminGwh: acumuladoGwh === null ? null : round6(acumuladoGwh), // GWh necesita varios decimales: 1 kWh = 0.000001 GWh
     energiaConsumidaKwh,
   };
 }
@@ -117,20 +123,21 @@ export function calcularEnergia({ potenciaTotalKw, energiaSuminGwh }, anterior) 
 // AGUA POTABLE (CISTERNA)
 // ---------------------------------------------------------------------------
 export function calcularAgua({ nivelCisternaPct }, anterior) {
-  const pct = Math.min(100, Math.max(0, Number(nivelCisternaPct) || 0));
-  const alturaM = (pct / 100) * PARAMETROS.cisterna.alturaM;
-  const volumenM3 = (pct / 100) * PARAMETROS.cisterna.capacidadM3;
+  const pctCrudo = numOrNull(nivelCisternaPct);
+  const pct = pctCrudo === null ? null : Math.min(100, Math.max(0, pctCrudo));
+  const alturaM = pct === null ? null : (pct / 100) * PARAMETROS.cisterna.alturaM;
+  const volumenM3 = pct === null ? null : (pct / 100) * PARAMETROS.cisterna.capacidadM3;
 
   let consumoM3 = null;
-  if (anterior && typeof anterior.agua?.volumenM3 === "number") {
+  if (volumenM3 !== null && anterior && typeof anterior.agua?.volumenM3 === "number") {
     // Positivo = consumo (bajó el nivel); negativo = se llenó la cisterna
     consumoM3 = anterior.agua.volumenM3 - volumenM3;
   }
 
   return {
-    nivelPct: round2(pct),
-    alturaM: round3(alturaM),
-    volumenM3: round3(volumenM3),
+    nivelPct: pct === null ? null : round2(pct),
+    alturaM: alturaM === null ? null : round3(alturaM),
+    volumenM3: volumenM3 === null ? null : round3(volumenM3),
     consumoM3: consumoM3 === null ? null : round3(consumoM3),
   };
 }

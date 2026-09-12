@@ -33,6 +33,16 @@ let horaSeleccionada = null; // "HH:00"
 let horasGuardadasDelDia = new Set(); // horas con documento ya guardado para inputFecha.value
 let horaExistiaAntes = false; // true si la hora cargada actualmente ya tenía datos guardados
 
+// Convierte el valor de un <input type="number"> a número, o a null si está
+// vacío o no es válido. Como ningún campo es obligatorio, un campo vacío ya
+// no debe tratarse como error (bloquear el guardado) ni como 0 (falsear los
+// cálculos) — significa simplemente "todavía no hay dato para esta hora".
+function numOrNull(valorTexto) {
+  if (valorTexto === "" || valorTexto === null || valorTexto === undefined) return null;
+  const n = parseFloat(valorTexto);
+  return Number.isNaN(n) ? null : n;
+}
+
 // ---------------------------------------------------------------------------
 // Franja de 24 horas del día seleccionado (chips clicables)
 // ---------------------------------------------------------------------------
@@ -212,7 +222,8 @@ async function guardarRegistro(ev) {
 
   const medidores = {};
   MEDIDORES.forEach(({ id }) => {
-    medidores[id] = parseFloat(form[id].value);
+    const campo = form[id];
+    medidores[id] = campo ? numOrNull(campo.value) : null;
   });
 
   const input = {
@@ -220,20 +231,25 @@ async function guardarRegistro(ev) {
     hora,
     estado: form.estado.value,
     operador: form.operador.value.trim(),
-    potenciaTotalKw: parseFloat(form.potenciaTotalKw.value),
-    energiaSuminGwh: parseFloat(form.energiaSuminGwh.value),
-    nivelCisternaPct: parseFloat(form.nivelCisternaPct.value),
-    glpPsi: [1, 2, 3, 4, 5, 6].map((i) => parseFloat(form[`glp${i}`].value)),
+    potenciaTotalKw: numOrNull(form.potenciaTotalKw.value),
+    energiaSuminGwh: numOrNull(form.energiaSuminGwh.value),
+    nivelCisternaPct: numOrNull(form.nivelCisternaPct.value),
+    glpPsi: [1, 2, 3, 4, 5, 6].map((i) => numOrNull(form[`glp${i}`].value)),
     medidores,
   };
 
-  const camposNumericosOk =
-    [input.potenciaTotalKw, input.energiaSuminGwh, input.nivelCisternaPct].every((v) => !Number.isNaN(v)) &&
-    input.glpPsi.every((v) => !Number.isNaN(v)) &&
-    Object.values(medidores).every((v) => !Number.isNaN(v));
+  // Ningún campo es obligatorio (así se puede guardar la hora aunque falten
+  // datos, y completarla después) — pero evitamos un guardado totalmente
+  // vacío por accidente (por ejemplo, si se presiona Enter sin llenar nada).
+  const hayAlgunDato =
+    input.potenciaTotalKw !== null ||
+    input.energiaSuminGwh !== null ||
+    input.nivelCisternaPct !== null ||
+    input.glpPsi.some((v) => v !== null) ||
+    Object.values(medidores).some((v) => v !== null);
 
-  if (!camposNumericosOk) {
-    mostrarToast("Revisa que todos los campos numéricos estén completos.", "error");
+  if (!hayAlgunDato) {
+    mostrarToast("No ingresaste ningún dato para esta hora.", "error");
     return;
   }
 
@@ -307,7 +323,7 @@ function init() {
   document.getElementById("info-parametros").innerHTML = `
     Cisterna: ${PARAMETROS.cisterna.alturaM} × ${PARAMETROS.cisterna.anchoM} × ${PARAMETROS.cisterna.largoM} m
     (≈ ${PARAMETROS.cisterna.capacidadM3.toFixed(1)} m³) · Tanque GLP: ${PARAMETROS.glp.capacidadVolumetricaL} L /
-    ${PARAMETROS.glp.capacidadMasaKg} kg × ${PARAMETROS.glp.numTanques} tanques · ${MEDIDORES.length} medidores de agua (M0-M16)
+    ${PARAMETROS.glp.capacidadMasaKg} kg × ${PARAMETROS.glp.numTanques} tanques · ${MEDIDORES.length} medidores de agua definidos (M0-M16), 8 activos
   `;
 
   inputFecha.addEventListener("change", alCambiarFecha);
