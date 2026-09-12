@@ -1,6 +1,6 @@
 // ============================================================================
 // calculos.js — Motor de cálculo del Sistema de Monitoreo Integral
-// Planta Valdivia, Santa Elena | Red 220V / 3Φ
+// Planta Valdivia, Santa Elena
 //
 // Todas las fórmulas están documentadas para que puedan auditarse o ajustarse
 // a futuro. Este módulo no depende de Firebase ni del DOM: son funciones
@@ -9,14 +9,9 @@
 // ============================================================================
 
 // ---------------------------------------------------------------------------
-// PARÁMETROS TÉCNICOS (tomados de la hoja "Parámetros y Cálculos" del Excel
-// y de las indicaciones directas de José)
+// PARÁMETROS TÉCNICOS
 // ---------------------------------------------------------------------------
 export const PARAMETROS = {
-  energia: {
-    voltajeLineaLinea: 220, // V, red trifásica
-    factorPotencia: 0.85, // cos φ inductivo estándar de planta industrial
-  },
   cisterna: {
     alturaM: 1.9,
     anchoM: 4.3,
@@ -93,41 +88,28 @@ export function horasDelDia() {
 // ---------------------------------------------------------------------------
 // ENERGÍA ELÉCTRICA
 // ---------------------------------------------------------------------------
-function promedio(valores) {
-  const validos = valores.filter((v) => typeof v === "number" && !Number.isNaN(v));
-  if (!validos.length) return 0;
-  return validos.reduce((a, b) => a + b, 0) / validos.length;
-}
+// Se ingresan dos lecturas directas del tablero cada hora:
+//   - potenciaTotalKw: demanda instantánea (kW) en el momento de la lectura.
+//   - energiaSuminGwh: lectura ACUMULADA del medidor de energía suministrada
+//     (GWh) — es un totalizador que solo sube, igual que un medidor de agua.
+// El consumo de esa hora en kWh se calcula como la diferencia entre la
+// lectura acumulada actual y la anterior (convertida de GWh a kWh), lo que
+// permite verificar la potencia real consumida hora a hora contra la
+// demanda instantánea reportada.
+export function calcularEnergia({ potenciaTotalKw, energiaSuminGwh }, anterior) {
+  const potencia = Number(potenciaTotalKw) || 0;
+  const acumuladoGwh = Number(energiaSuminGwh) || 0;
 
-export function calcularEnergia({ corrienteL1, corrienteL2, corrienteL3 }) {
-  const i1 = Number(corrienteL1) || 0;
-  const i2 = Number(corrienteL2) || 0;
-  const i3 = Number(corrienteL3) || 0;
-  const promAmp = promedio([i1, i2, i3]);
-
-  // Potencia activa trifásica: P(kW) = √3 x V_LL x I_prom x cosφ / 1000
-  const potenciaKw =
-    (Math.sqrt(3) * PARAMETROS.energia.voltajeLineaLinea * promAmp * PARAMETROS.energia.factorPotencia) / 1000;
-
-  // Energía en el intervalo horario (1 h): kWh = kW x 1h
-  const energiaKwh = potenciaKw;
-
-  // Desbalance de corrientes (NEMA simplificado): máxima desviación respecto
-  // al promedio, expresada como % del promedio.
-  let desbalancePct = 0;
-  if (promAmp > 0) {
-    const desviaciones = [i1, i2, i3].map((i) => Math.abs(i - promAmp));
-    desbalancePct = (Math.max(...desviaciones) / promAmp) * 100;
+  let energiaConsumidaKwh = null;
+  if (anterior && typeof anterior.energia?.energiaSuminGwh === "number") {
+    const deltaGwh = acumuladoGwh - anterior.energia.energiaSuminGwh;
+    energiaConsumidaKwh = round2(deltaGwh * 1_000_000); // 1 GWh = 1,000,000 kWh
   }
 
   return {
-    corrienteL1: i1,
-    corrienteL2: i2,
-    corrienteL3: i3,
-    promAmp: round2(promAmp),
-    potenciaKw: round2(potenciaKw),
-    energiaKwh: round2(energiaKwh),
-    desbalancePct: round2(desbalancePct),
+    potenciaTotalKw: round2(potencia),
+    energiaSuminGwh: round6(acumuladoGwh), // GWh necesita varios decimales: 1 kWh = 0.000001 GWh
+    energiaConsumidaKwh,
   };
 }
 
@@ -189,8 +171,72 @@ export function calcularGlp({ glpPsi }, anterior) {
   return { tanques, promPsi, promKgcm2, masaTotalKg, volumenTotalL, pctTotal, capacidadTotalKg, consumoKgHora };
 }
 
+function promedio(valores) {
+  const validos = valores.filter((v) => typeof v === "number" && !Number.isNaN(v));
+  if (!validos.length) return 0;
+  return validos.reduce((a, b) => a + b, 0) / validos.length;
+}
+
 // ---------------------------------------------------------------------------
-// Registro completo (une los tres bloques + metadatos)
+// MEDIDORES DE AGUA POR ÁREA (M0-M16)
+// ---------------------------------------------------------------------------
+// Cada medidor es un TOTALIZADOR (como un medidor de agua normal): la cifra
+// que se ingresa solo sube con el tiempo. El consumo de cada hora se calcula
+// como la diferencia entre la lectura actual y la lectura anterior de ESE
+// mismo medidor — igual que ya se hace con la cisterna.
+//
+// M0-M2 son el tren de tratamiento (entrada de pozo → producto/rechazo de
+// ósmosis) y M3 es el medidor maestro de "consumo de planta". M4-M16 son
+// puntos de consumo por área — se usan para el gráfico de "consumo por área"
+// del dashboard y para el balance de distribución (M3 vs. suma de áreas).
+export const MEDIDORES = [
+  { id: "m0", nombre: "Entrada agua de pozo" },
+  { id: "m1", nombre: "Agua producto ósmosis" },
+  { id: "m2", nombre: "Rechazo de ósmosis" },
+  { id: "m3", nombre: "Consumo de planta" },
+  { id: "m4", nombre: "Baños y comedor" },
+  { id: "m5", nombre: "PTARI y recepción de pesca" },
+  { id: "m6", nombre: "Torre de enfriamiento" },
+  { id: "m7", nombre: "Calderos" },
+  { id: "m8", nombre: "Línea de atún" },
+  { id: "m9", nombre: "Línea de sardinas" },
+  { id: "m10", nombre: "Lavandería" },
+  { id: "m11", nombre: "Descongelado de atún" },
+  { id: "m12", nombre: "Recepción de atún (tolva de envasado)" },
+  { id: "m13", nombre: "Retorno de agua de tanque reserva" },
+  { id: "m14", nombre: "Descongelado de atún por recirculación" },
+  { id: "m15", nombre: "Limpieza de pisos en general" },
+  { id: "m16", nombre: "Administración" },
+];
+
+// Meters que representan un punto de consumo por área (para el ranking del
+// dashboard y el balance de distribución). Excluye el tren de tratamiento
+// (m0, m1, m2) y el medidor maestro de planta (m3), que se muestran aparte.
+export const MEDIDORES_AREA_IDS = ["m4", "m5", "m6", "m7", "m8", "m9", "m10", "m11", "m12", "m13", "m14", "m15", "m16"];
+
+export function calcularMedidores({ medidores }, anterior) {
+  const lecturas = medidores || {};
+  const anteriores = anterior?.medidores || {};
+  const resultado = {};
+  MEDIDORES.forEach(({ id, nombre }) => {
+    const raw = lecturas[id];
+    const lectura = raw === null || raw === undefined || raw === "" ? null : Number(raw);
+    let consumoM3 = null;
+    if (lectura !== null && typeof anteriores[id]?.lectura === "number") {
+      // Totalizador: solo sube. Consumo de la hora = lectura actual - anterior.
+      consumoM3 = round3(lectura - anteriores[id].lectura);
+    }
+    resultado[id] = {
+      nombre,
+      lectura: lectura === null ? null : round3(lectura),
+      consumoM3,
+    };
+  });
+  return resultado;
+}
+
+// ---------------------------------------------------------------------------
+// Registro completo (une los cuatro bloques + metadatos)
 // ---------------------------------------------------------------------------
 export function calcularRegistro(input, anterior = null) {
   return {
@@ -199,9 +245,10 @@ export function calcularRegistro(input, anterior = null) {
     turno: turnoDeHora(input.hora),
     estado: input.estado || "OK",
     operador: input.operador || "",
-    energia: calcularEnergia(input),
+    energia: calcularEnergia(input, anterior),
     agua: calcularAgua(input, anterior),
     glp: calcularGlp(input, anterior),
+    medidores: calcularMedidores(input, anterior),
   };
 }
 
@@ -213,6 +260,9 @@ export function round2(n) {
 }
 export function round3(n) {
   return Math.round((n + Number.EPSILON) * 1000) / 1000;
+}
+export function round6(n) {
+  return Math.round((n + Number.EPSILON) * 1e6) / 1e6;
 }
 
 export function fechaHoraOrdenable(fecha, hora) {

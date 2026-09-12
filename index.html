@@ -4,6 +4,11 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Monitoreo Integral — Planta Valdivia</title>
+<meta name="theme-color" content="#0b1119" />
+<meta name="description" content="Monitoreo de energía, agua y GLP — Planta Valdivia" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css" />
@@ -65,12 +70,16 @@
         </div>
 
         <fieldset>
-          <legend>Energía eléctrica — corrientes por fase (A)</legend>
+          <legend>Energía eléctrica</legend>
           <div class="field-row">
-            <label>L1 <input type="number" step="any" name="corrienteL1" required /></label>
-            <label>L2 <input type="number" step="any" name="corrienteL2" required /></label>
-            <label>L3 <input type="number" step="any" name="corrienteL3" required /></label>
+            <label>Potencia total (kW)
+              <input type="number" step="any" name="potenciaTotalKw" required />
+            </label>
+            <label>Energía suministrada — lectura acumulada (GWh)
+              <input type="number" step="any" name="energiaSuminGwh" required />
+            </label>
           </div>
+          <p class="muted small">La energía suministrada es la lectura del medidor totalizador (solo sube) — el consumo de la hora se calcula solo, como diferencia con la lectura anterior.</p>
         </fieldset>
 
         <fieldset>
@@ -79,6 +88,30 @@
             <label>Nivel cisterna (%)
               <input type="number" step="any" min="0" max="100" name="nivelCisternaPct" required />
             </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Medidores de agua por área — lectura acumulada (m³)</legend>
+          <p class="muted small">Todos son totalizadores (como un medidor de agua normal): anota la cifra que marcan ahora mismo, el consumo de la hora se calcula solo.</p>
+          <div class="field-row field-row--medidores">
+            <label>M0 · Entrada agua de pozo <input type="number" step="any" name="m0" required /></label>
+            <label>M1 · Agua producto ósmosis <input type="number" step="any" name="m1" required /></label>
+            <label>M2 · Rechazo de ósmosis <input type="number" step="any" name="m2" required /></label>
+            <label>M3 · Consumo de planta <input type="number" step="any" name="m3" required /></label>
+            <label>M4 · Baños y comedor <input type="number" step="any" name="m4" required /></label>
+            <label>M5 · PTARI y recepción de pesca <input type="number" step="any" name="m5" required /></label>
+            <label>M6 · Torre de enfriamiento <input type="number" step="any" name="m6" required /></label>
+            <label>M7 · Calderos <input type="number" step="any" name="m7" required /></label>
+            <label>M8 · Línea de atún <input type="number" step="any" name="m8" required /></label>
+            <label>M9 · Línea de sardinas <input type="number" step="any" name="m9" required /></label>
+            <label>M10 · Lavandería <input type="number" step="any" name="m10" required /></label>
+            <label>M11 · Descongelado de atún <input type="number" step="any" name="m11" required /></label>
+            <label>M12 · Recepción de atún (tolva de envasado) <input type="number" step="any" name="m12" required /></label>
+            <label>M13 · Retorno de agua de tanque reserva <input type="number" step="any" name="m13" required /></label>
+            <label>M14 · Descongelado de atún por recirculación <input type="number" step="any" name="m14" required /></label>
+            <label>M15 · Limpieza de pisos en general <input type="number" step="any" name="m15" required /></label>
+            <label>M16 · Administración <input type="number" step="any" name="m16" required /></label>
           </div>
         </fieldset>
 
@@ -105,7 +138,6 @@
         </div>
         <p class="muted small">Tip: presiona <kbd>Enter</kbd> después de cada valor para saltar al siguiente campo sin usar el mouse.</p>
         <p id="info-parametros" class="muted small"></p>
-        <button type="button" id="btn-cargar-excel" class="btn-link">Cargar datos de referencia del Excel (una vez, opcional)</button>
       </form>
 
       <aside class="card card--panel">
@@ -118,8 +150,8 @@
         <ul class="lista-parametros">
           <li>Cisterna: 1.9 × 4.3 × 6.7 m (≈55 m³ nominal)</li>
           <li>Tanque GLP: 7 500 L / 4 050 kg c/u — 6 tanques</li>
-          <li>Red: 220 V trifásica, cos φ = 0.85</li>
           <li>Conversión: 1 PSI = 0.070307 kg/cm²</li>
+          <li>17 medidores de agua (M0-M16), todos totalizadores</li>
         </ul>
       </aside>
     </div>
@@ -155,19 +187,10 @@
     <div class="chart-card">
       <div class="chart-card__header">
         <h2>Energía eléctrica</h2>
-        <p class="muted">Potencia activa (kW) y energía consumida por hora (kWh), calculadas como P = √3·V·I<sub>prom</sub>·cosφ.</p>
+        <p class="muted">Potencia total leída (kW) y energía realmente consumida cada hora (kWh), calculada como la diferencia entre lecturas consecutivas del medidor acumulado.</p>
       </div>
       <div class="chart-wrap"><canvas id="chart-energia"></canvas></div>
       <p class="diagnostico" id="diag-energia"></p>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-card__header">
-        <h2>Corrientes por fase y desbalance</h2>
-        <p class="muted">Corriente en cada línea (L1, L2, L3) y % de desbalance respecto al promedio (referencia NEMA MG1: &lt;15% recomendado).</p>
-      </div>
-      <div class="chart-wrap"><canvas id="chart-corrientes"></canvas></div>
-      <p class="diagnostico" id="diag-corrientes"></p>
     </div>
 
     <div class="chart-card">
@@ -177,6 +200,24 @@
       </div>
       <div class="chart-wrap"><canvas id="chart-agua"></canvas></div>
       <p class="diagnostico" id="diag-agua"></p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-card__header">
+        <h2>Consumo de agua por área</h2>
+        <p class="muted">Ranking de las 13 áreas de la planta por consumo de agua en el periodo (m³), de mayor a menor — para ver de un vistazo dónde se usa más agua.</p>
+      </div>
+      <div class="chart-wrap chart-wrap--alto"><canvas id="chart-medidores-areas"></canvas></div>
+      <p class="diagnostico" id="diag-medidores"></p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-card__header">
+        <h2>Tratamiento de agua — ósmosis</h2>
+        <p class="muted">Agua que entra del pozo (M0) frente a lo que produce (M1) y rechaza (M2) el sistema de ósmosis, con el % de recuperación del proceso.</p>
+      </div>
+      <div class="chart-wrap"><canvas id="chart-osmosis"></canvas></div>
+      <p class="diagnostico" id="diag-osmosis"></p>
     </div>
 
     <div class="chart-card">
@@ -209,5 +250,16 @@
 </script>
 <script type="module" src="js/app.js"></script>
 <script type="module" src="js/dashboard.js"></script>
+<script>
+  // Registra el service worker para que el navegador ofrezca "Instalar app"
+  // (icono en la barra de direcciones) y la app quede disponible como PWA.
+  // Rutas relativas porque el sitio vive en un subpath de GitHub Pages
+  // (https://usuario.github.io/registro_indicadores_planta/), no en la raíz.
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("service-worker.js").catch((err) => console.error("SW:", err));
+    });
+  }
+</script>
 </body>
 </html>

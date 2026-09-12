@@ -128,6 +128,9 @@ legend {
 .field-row--glp { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 @media (max-width: 560px) { .field-row--glp { grid-template-columns: repeat(2, 1fr); } }
 
+.field-row--medidores { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+@media (max-width: 640px) { .field-row--medidores { grid-template-columns: 1fr; } }
+
 label {
   display: flex;
   flex-direction: column;
@@ -281,6 +284,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 .chart-card__header p { font-size: 0.82rem; margin: 0; }
 
 .chart-wrap { position: relative; height: 280px; margin-bottom: 8px; }
+.chart-wrap--alto { height: 420px; }
 
 .diagnostico {
   font-size: 0.85rem;

@@ -16,6 +16,7 @@ import {
   docIdFechaHora,
   siguienteHoraFecha,
   PARAMETROS,
+  MEDIDORES,
 } from "./calculos.js";
 import { mostrarToast, fmt, hoyISO } from "./ui.js";
 
@@ -26,7 +27,6 @@ const horasStrip = document.getElementById("horas-strip");
 const resumenDia = document.getElementById("resumen-dia");
 const badgeTurno = document.getElementById("badge-turno");
 const panelAnterior = document.getElementById("panel-anterior");
-const btnCargarExcel = document.getElementById("btn-cargar-excel");
 const btnGuardar = document.getElementById("btn-guardar");
 
 let horaSeleccionada = null; // "HH:00"
@@ -95,12 +95,15 @@ async function cargarHoraEnFormulario(hora) {
 
   if (horaExistiaAntes) {
     const d = snap.data();
-    form.corrienteL1.value = d.energia?.corrienteL1 ?? "";
-    form.corrienteL2.value = d.energia?.corrienteL2 ?? "";
-    form.corrienteL3.value = d.energia?.corrienteL3 ?? "";
+    form.potenciaTotalKw.value = d.energia?.potenciaTotalKw ?? "";
+    form.energiaSuminGwh.value = d.energia?.energiaSuminGwh ?? "";
     form.estado.value = d.estado ?? "OK";
     form.operador.value = d.operador ?? "";
     form.nivelCisternaPct.value = d.agua?.nivelPct ?? "";
+    MEDIDORES.forEach(({ id }) => {
+      const campo = form[id];
+      if (campo) campo.value = d.medidores?.[id]?.lectura ?? "";
+    });
     (d.glp?.tanques || []).forEach((t, i) => {
       const campo = form[`glp${i + 1}`];
       if (campo) campo.value = t.psi ?? "";
@@ -118,16 +121,27 @@ async function cargarHoraEnFormulario(hora) {
 // Limpia solo los campos de datos (deja "hora-actual", que no es parte de
 // este ciclo, intacto — usar form.reset() lo borraría porque vive dentro del <form>).
 function limpiarCampos() {
-  ["corrienteL1", "corrienteL2", "corrienteL3", "nivelCisternaPct", "glp1", "glp2", "glp3", "glp4", "glp5", "glp6", "operador"].forEach(
-    (nombre) => {
-      if (form[nombre]) form[nombre].value = "";
-    }
-  );
+  const nombres = [
+    "potenciaTotalKw",
+    "energiaSuminGwh",
+    "nivelCisternaPct",
+    ...MEDIDORES.map((m) => m.id),
+    "glp1",
+    "glp2",
+    "glp3",
+    "glp4",
+    "glp5",
+    "glp6",
+    "operador",
+  ];
+  nombres.forEach((nombre) => {
+    if (form[nombre]) form[nombre].value = "";
+  });
   form.estado.value = "OK";
 }
 
 function enfocarPrimerCampo() {
-  const primero = form.querySelector('input[name="corrienteL1"]');
+  const primero = form.querySelector('input[name="potenciaTotalKw"]');
   if (primero) primero.focus();
 }
 
@@ -158,9 +172,10 @@ async function mostrarPanelAnterior(fecha, hora) {
   panelAnterior.innerHTML = `
     <p class="muted">Última lectura anterior: <strong>${anterior.fecha} ${anterior.hora}</strong> (${anterior.turno})</p>
     <div class="mini-grid">
-      <div><span>Potencia</span><strong>${fmt(anterior.energia?.potenciaKw)} kW</strong></div>
+      <div><span>Potencia</span><strong>${fmt(anterior.energia?.potenciaTotalKw)} kW</strong></div>
       <div><span>Nivel cisterna</span><strong>${fmt(anterior.agua?.nivelPct)} %</strong></div>
       <div><span>GLP total</span><strong>${fmt(anterior.glp?.masaTotalKg, 0)} kg</strong></div>
+      <div><span>M3 · Consumo planta</span><strong>${fmt(anterior.medidores?.m3?.lectura, 1)} m³</strong></div>
     </div>`;
 }
 
@@ -195,22 +210,27 @@ async function guardarRegistro(ev) {
     return;
   }
 
+  const medidores = {};
+  MEDIDORES.forEach(({ id }) => {
+    medidores[id] = parseFloat(form[id].value);
+  });
+
   const input = {
     fecha,
     hora,
     estado: form.estado.value,
     operador: form.operador.value.trim(),
-    corrienteL1: parseFloat(form.corrienteL1.value),
-    corrienteL2: parseFloat(form.corrienteL2.value),
-    corrienteL3: parseFloat(form.corrienteL3.value),
+    potenciaTotalKw: parseFloat(form.potenciaTotalKw.value),
+    energiaSuminGwh: parseFloat(form.energiaSuminGwh.value),
     nivelCisternaPct: parseFloat(form.nivelCisternaPct.value),
     glpPsi: [1, 2, 3, 4, 5, 6].map((i) => parseFloat(form[`glp${i}`].value)),
+    medidores,
   };
 
   const camposNumericosOk =
-    [input.corrienteL1, input.corrienteL2, input.corrienteL3, input.nivelCisternaPct].every(
-      (v) => !Number.isNaN(v)
-    ) && input.glpPsi.every((v) => !Number.isNaN(v));
+    [input.potenciaTotalKw, input.energiaSuminGwh, input.nivelCisternaPct].every((v) => !Number.isNaN(v)) &&
+    input.glpPsi.every((v) => !Number.isNaN(v)) &&
+    Object.values(medidores).every((v) => !Number.isNaN(v));
 
   if (!camposNumericosOk) {
     mostrarToast("Revisa que todos los campos numéricos estén completos.", "error");
@@ -287,8 +307,7 @@ function init() {
   document.getElementById("info-parametros").innerHTML = `
     Cisterna: ${PARAMETROS.cisterna.alturaM} × ${PARAMETROS.cisterna.anchoM} × ${PARAMETROS.cisterna.largoM} m
     (≈ ${PARAMETROS.cisterna.capacidadM3.toFixed(1)} m³) · Tanque GLP: ${PARAMETROS.glp.capacidadVolumetricaL} L /
-    ${PARAMETROS.glp.capacidadMasaKg} kg × ${PARAMETROS.glp.numTanques} tanques · Red ${PARAMETROS.energia.voltajeLineaLinea} V,
-    cos φ ${PARAMETROS.energia.factorPotencia}
+    ${PARAMETROS.glp.capacidadMasaKg} kg × ${PARAMETROS.glp.numTanques} tanques · ${MEDIDORES.length} medidores de agua (M0-M16)
   `;
 
   inputFecha.addEventListener("change", alCambiarFecha);
@@ -297,50 +316,9 @@ function init() {
     if (btn) cargarHoraEnFormulario(btn.dataset.hora);
   });
   form.addEventListener("submit", guardarRegistro);
-  btnCargarExcel.addEventListener("click", cargarDatosDeExcel);
   habilitarSaltoConEnter();
 
   alCambiarFecha();
-}
-
-// ---------------------------------------------------------------------------
-// Botón de utilidad: carga las 24 lecturas de referencia extraídas del Excel
-// (data/seed-excel.json) procesándolas por el mismo motor de cálculo, para
-// tener datos reales con qué probar el dashboard de inmediato.
-// Nota: requiere servir el sitio con un servidor local (no funciona abriendo
-// index.html con doble clic / file://, por restricciones del navegador al
-// hacer fetch() de archivos locales).
-// ---------------------------------------------------------------------------
-async function cargarDatosDeExcel() {
-  if (!confirm("Esto escribirá 24 lecturas de referencia (tomadas del Excel) en tu Firestore. ¿Continuar?")) return;
-  btnCargarExcel.disabled = true;
-  btnCargarExcel.textContent = "Cargando...";
-  try {
-    const res = await fetch("data/seed-excel.json");
-    if (!res.ok) throw new Error("No se pudo leer data/seed-excel.json (¿estás usando un servidor local?)");
-    const filas = await res.json();
-    filas.sort((a, b) => fechaHoraOrdenable(a.fecha, a.hora).localeCompare(fechaHoraOrdenable(b.fecha, b.hora)));
-
-    let anterior = await obtenerAnterior(filas[0].fecha, filas[0].hora);
-    let guardadas = 0;
-    for (const fila of filas) {
-      const registro = calcularRegistro(fila, anterior);
-      registro.fechaHora = fechaHoraOrdenable(fila.fecha, fila.hora);
-      registro.actualizadoEn = new Date().toISOString();
-      const id = docIdFechaHora(fila.fecha, fila.hora);
-      await setDoc(doc(db, "lecturas", id), registro, { merge: true });
-      anterior = registro;
-      guardadas++;
-    }
-    mostrarToast(`Se cargaron ${guardadas} lecturas de referencia. Revisa el Dashboard Gerencial.`, "success");
-    await alCambiarFecha();
-  } catch (err) {
-    console.error(err);
-    mostrarToast("Error al cargar datos de referencia: " + err.message, "error");
-  } finally {
-    btnCargarExcel.disabled = false;
-    btnCargarExcel.textContent = "Cargar datos de referencia del Excel (una vez, opcional)";
-  }
 }
 
 init();

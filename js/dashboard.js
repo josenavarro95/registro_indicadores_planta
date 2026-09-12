@@ -3,7 +3,7 @@
 // diagnóstico automático de comportamiento (normal / atención / crítico).
 // ============================================================================
 import { lecturasRef, getDocs, query, where, orderBy } from "./firebase-init.js";
-import { PARAMETROS } from "./calculos.js";
+import { PARAMETROS, MEDIDORES, MEDIDORES_AREA_IDS } from "./calculos.js";
 import { mostrarToast, fmt, fmtFecha, hoyISO } from "./ui.js";
 
 const inputDesde = document.getElementById("input-desde");
@@ -22,6 +22,10 @@ const PALETA = {
   umbral: "#ff5c5c",
   glp: "#c792ea",
 };
+
+// Paleta cíclica para el gráfico de 13 áreas de consumo de agua — colores
+// bien diferenciables entre sí sobre fondo oscuro.
+const PALETA_AREAS = ["#3fb6ff", "#4fd1c5", "#7ee787", "#ffb547", "#c792ea", "#ff6ec7", "#f4d35e", "#8aa9ff", "#5ee6c0", "#ff9166", "#a0e17a", "#7fc8ff", "#e0a3ff"];
 
 function hace(dias) {
   const d = new Date();
@@ -54,8 +58,8 @@ function etiqueta(r) {
 // KPIs
 // ---------------------------------------------------------------------------
 function renderKPIs(registros) {
-  const totalEnergiaKwh = registros.reduce((a, r) => a + (r.energia?.energiaKwh || 0), 0);
-  const demandaMaximaKw = registros.reduce((a, r) => Math.max(a, r.energia?.potenciaKw || 0), 0);
+  const totalEnergiaKwh = registros.reduce((a, r) => a + Math.max(0, r.energia?.energiaConsumidaKwh || 0), 0);
+  const demandaMaximaKw = registros.reduce((a, r) => Math.max(a, r.energia?.potenciaTotalKw || 0), 0);
   const totalAguaM3 = registros.reduce((a, r) => a + Math.max(0, r.agua?.consumoM3 || 0), 0);
   const totalGlpKg = registros.reduce((a, r) => a + Math.max(0, r.glp?.consumoKgHora || 0), 0);
 
@@ -112,15 +116,15 @@ function lineaUmbral(valor, etiquetas, texto) {
 // ---------------------------------------------------------------------------
 function renderEnergia(registros) {
   const etiquetas = registros.map(etiqueta);
-  const potencia = registros.map((r) => r.energia?.potenciaKw ?? null);
-  const energiaKwh = registros.map((r) => r.energia?.energiaKwh ?? null);
+  const potencia = registros.map((r) => r.energia?.potenciaTotalKw ?? null);
+  const energiaKwh = registros.map((r) => r.energia?.energiaConsumidaKwh ?? null);
 
   dibujar("chart-energia", {
     data: {
       labels: etiquetas,
       datasets: [
-        { type: "bar", label: "Energía (kWh/hora)", data: energiaKwh, backgroundColor: "#3fb6ff55", borderColor: PALETA.energia, borderWidth: 1, yAxisID: "y" },
-        { type: "line", label: "Potencia activa (kW)", data: potencia, borderColor: PALETA.potencia, backgroundColor: "transparent", tension: 0.3, pointRadius: 2, yAxisID: "y" },
+        { type: "bar", label: "Energía consumida (kWh/hora)", data: energiaKwh, backgroundColor: "#3fb6ff55", borderColor: PALETA.energia, borderWidth: 1, yAxisID: "y" },
+        { type: "line", label: "Potencia total (kW)", data: potencia, borderColor: PALETA.potencia, backgroundColor: "transparent", tension: 0.3, pointRadius: 2, yAxisID: "y" },
       ],
     },
     options: { ...opcionesBase, scales: { ...opcionesBase.scales, y: { ...opcionesBase.scales.y, title: { display: true, text: "kW / kWh", color: "#8ea0b4" } } } },
@@ -139,48 +143,6 @@ function renderEnergia(registros) {
     }
   }
   document.getElementById("diag-energia").textContent = diag;
-}
-
-// ---------------------------------------------------------------------------
-// Corrientes / desbalance
-// ---------------------------------------------------------------------------
-function renderCorrientes(registros) {
-  const etiquetas = registros.map(etiqueta);
-  const l1 = registros.map((r) => r.energia?.corrienteL1 ?? null);
-  const l2 = registros.map((r) => r.energia?.corrienteL2 ?? null);
-  const l3 = registros.map((r) => r.energia?.corrienteL3 ?? null);
-  const desb = registros.map((r) => r.energia?.desbalancePct ?? null);
-
-  dibujar("chart-corrientes", {
-    type: "line",
-    data: {
-      labels: etiquetas,
-      datasets: [
-        { label: "L1 (A)", data: l1, borderColor: PALETA.l1, tension: 0.3, pointRadius: 1.5, yAxisID: "y" },
-        { label: "L2 (A)", data: l2, borderColor: PALETA.l2, tension: 0.3, pointRadius: 1.5, yAxisID: "y" },
-        { label: "L3 (A)", data: l3, borderColor: PALETA.l3, tension: 0.3, pointRadius: 1.5, yAxisID: "y" },
-        { label: "Desbalance (%)", data: desb, borderColor: PALETA.umbral, borderDash: [4, 3], tension: 0.3, pointRadius: 0, yAxisID: "y1" },
-      ],
-    },
-    options: {
-      ...opcionesBase,
-      scales: {
-        ...opcionesBase.scales,
-        y: { ...opcionesBase.scales.y, title: { display: true, text: "Amperios", color: "#8ea0b4" } },
-        y1: { position: "right", ticks: { color: PALETA.umbral }, grid: { display: false }, title: { display: true, text: "Desbalance %", color: PALETA.umbral } },
-      },
-    },
-  });
-
-  const stDesb = estadistica(desb);
-  let diag = "Sin datos suficientes para diagnóstico.";
-  if (desb.length) {
-    diag =
-      stDesb.max > 15
-        ? `⚠ Se registró un desbalance máximo de ${fmt(stDesb.max)}% entre líneas — por encima del 15% recomendado (NEMA MG1). Revisar carga por fase.`
-        : `✓ Desbalance de corrientes dentro de lo aceptable (máximo del periodo: ${fmt(stDesb.max)}%, típicamente <15%).`;
-  }
-  document.getElementById("diag-corrientes").textContent = diag;
 }
 
 // ---------------------------------------------------------------------------
@@ -214,6 +176,94 @@ function renderAgua(registros) {
         : `✓ Nivel de cisterna en ${fmt(ultimoNivel)}% (${fmt(volumen[volumen.length - 1])} m³ de ${fmt(PARAMETROS.cisterna.capacidadM3, 1)} m³). Consumo neto del periodo: ${fmt(totalConsumo, 2)} m³.`;
   }
   document.getElementById("diag-agua").textContent = diag;
+}
+
+// ---------------------------------------------------------------------------
+// Medidores de agua por área (M4-M16) — ranking de consumo del periodo
+// ---------------------------------------------------------------------------
+function renderMedidoresAreas(registros) {
+  const totales = MEDIDORES_AREA_IDS.map((id) => {
+    const meta = MEDIDORES.find((m) => m.id === id);
+    const total = registros.reduce((a, r) => a + Math.max(0, r.medidores?.[id]?.consumoM3 || 0), 0);
+    return { id, nombre: meta.nombre, total };
+  }).sort((a, b) => b.total - a.total); // de mayor a menor consumo — así se lee de un vistazo
+
+  const etiquetas = totales.map((t) => `${t.id.toUpperCase()} · ${t.nombre}`);
+  const valores = totales.map((t) => t.total);
+  // El mayor consumidor se resalta en rojo/alerta para que salte a la vista;
+  // el resto usa la paleta cíclica para poder distinguir cada barra.
+  const colores = totales.map((_, i) => (i === 0 ? PALETA.umbral : PALETA_AREAS[i % PALETA_AREAS.length]));
+
+  dibujar("chart-medidores-areas", {
+    type: "bar",
+    data: {
+      labels: etiquetas,
+      datasets: [{ label: "Consumo del periodo (m³)", data: valores, backgroundColor: colores, borderRadius: 4, barThickness: 18 }],
+    },
+    options: {
+      ...opcionesBase,
+      indexAxis: "y", // barras horizontales: mucho más legibles con 13 categorías que un gráfico de líneas
+      plugins: { ...opcionesBase.plugins, legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#8ea0b4" }, grid: { color: "#1a2431" }, title: { display: true, text: "m³ consumidos en el periodo", color: "#8ea0b4" } },
+        y: { ticks: { color: "#c9d6e3", font: { size: 11 } }, grid: { display: false } },
+      },
+    },
+  });
+
+  const totalAreas = totales.reduce((a, t) => a + t.total, 0);
+  const totalPlanta = registros.reduce((a, r) => a + Math.max(0, r.medidores?.m3?.consumoM3 || 0), 0);
+  let diag = "Sin datos suficientes para diagnóstico.";
+  if (totales.length && totalAreas > 0) {
+    const top = totales[0];
+    const pctTop = (top.total / totalAreas) * 100;
+    diag = `El área con mayor consumo del periodo es "${top.nombre}" (${fmt(top.total, 1)} m³ — ${fmt(pctTop, 0)}% del total medido por área).`;
+    if (totalPlanta > 0) {
+      const diferenciaPct = ((totalAreas - totalPlanta) / totalPlanta) * 100;
+      diag +=
+        Math.abs(diferenciaPct) > 10
+          ? ` ⚠ La suma de las 13 áreas (${fmt(totalAreas, 1)} m³) difiere ${fmt(Math.abs(diferenciaPct), 0)}% del medidor maestro M3 · Consumo de planta (${fmt(totalPlanta, 1)} m³) — revisar posibles fugas o un punto de consumo sin medir.`
+          : ` ✓ La suma de las 13 áreas coincide razonablemente con el medidor maestro M3 (${fmt(totalPlanta, 1)} m³).`;
+    }
+  }
+  document.getElementById("diag-medidores").textContent = diag;
+}
+
+// ---------------------------------------------------------------------------
+// Tratamiento de agua — ósmosis (M0 entrada, M1 producto, M2 rechazo)
+// ---------------------------------------------------------------------------
+function renderOsmosis(registros) {
+  const etiquetas = registros.map(etiqueta);
+  const entrada = registros.map((r) => r.medidores?.m0?.consumoM3 ?? null);
+  const producto = registros.map((r) => r.medidores?.m1?.consumoM3 ?? null);
+  const rechazo = registros.map((r) => r.medidores?.m2?.consumoM3 ?? null);
+
+  dibujar("chart-osmosis", {
+    type: "line",
+    data: {
+      labels: etiquetas,
+      datasets: [
+        { label: "M0 · Entrada de pozo (m³/h)", data: entrada, borderColor: PALETA.l1, tension: 0.3, pointRadius: 1.5 },
+        { label: "M1 · Producto ósmosis (m³/h)", data: producto, borderColor: PALETA.agua, tension: 0.3, pointRadius: 1.5 },
+        { label: "M2 · Rechazo ósmosis (m³/h)", data: rechazo, borderColor: PALETA.umbral, tension: 0.3, pointRadius: 1.5 },
+      ],
+    },
+    options: { ...opcionesBase, scales: { ...opcionesBase.scales, y: { ...opcionesBase.scales.y, title: { display: true, text: "m³ por hora", color: "#8ea0b4" } } } },
+  });
+
+  const totalProducto = producto.reduce((a, v) => a + Math.max(0, v || 0), 0);
+  const totalRechazo = rechazo.reduce((a, v) => a + Math.max(0, v || 0), 0);
+  let diag = "Sin datos suficientes para diagnóstico.";
+  const base = totalProducto + totalRechazo;
+  if (base > 0) {
+    const recuperacionPct = (totalProducto / base) * 100;
+    diag = `Recuperación del proceso de ósmosis en el periodo: ${fmt(recuperacionPct, 0)}% (producto: ${fmt(totalProducto, 1)} m³ · rechazo: ${fmt(totalRechazo, 1)} m³).`;
+    diag +=
+      recuperacionPct < 40
+        ? " ⚠ Por debajo del rango típico de ósmosis inversa industrial (40-75%) — revisar membranas o presión de operación."
+        : " ✓ Dentro del rango típico de ósmosis inversa industrial (40-75%).";
+  }
+  document.getElementById("diag-osmosis").textContent = diag;
 }
 
 // ---------------------------------------------------------------------------
@@ -294,8 +344,9 @@ async function actualizarDashboard() {
     }
     renderKPIs(registros);
     renderEnergia(registros);
-    renderCorrientes(registros);
     renderAgua(registros);
+    renderMedidoresAreas(registros);
+    renderOsmosis(registros);
     renderGlp(registros);
   } catch (err) {
     console.error(err);
