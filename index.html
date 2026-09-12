@@ -209,16 +209,16 @@
     <div class="chart-card">
       <div class="chart-card__header">
         <h2>Consumo de agua por área</h2>
-        <p class="muted">Ranking de las 13 áreas de la planta por consumo de agua en el periodo (m³), de mayor a menor — para ver de un vistazo dónde se usa más agua.</p>
+        <p class="muted">Consumo por hora de las áreas que ya se están registrando (M1, M3, M4, M5, M7, M8, M9, M16) — una línea por área, para ver en qué momento del turno sube o baja cada una. Las demás áreas se suman solas en cuanto se activen.</p>
       </div>
-      <div class="chart-wrap chart-wrap--alto"><canvas id="chart-medidores-areas"></canvas></div>
+      <div class="chart-wrap"><canvas id="chart-medidores-areas"></canvas></div>
       <p class="diagnostico" id="diag-medidores"></p>
     </div>
 
     <div class="chart-card">
       <div class="chart-card__header">
         <h2>Tratamiento de agua — ósmosis</h2>
-        <p class="muted">Agua que entra del pozo (M0) frente a lo que produce (M1) y rechaza (M2) el sistema de ósmosis, con el % de recuperación del proceso.</p>
+        <p class="muted">Comportamiento por hora del medidor de ósmosis que ya se está registrando (M1 · Producto) — para ver en qué turno sube o baja el consumo. Cuando se active el registro de M0 (entrada) y M2 (rechazo), se sumarán aquí solos y se calculará el % de recuperación real del proceso.</p>
       </div>
       <div class="chart-wrap"><canvas id="chart-osmosis"></canvas></div>
       <p class="diagnostico" id="diag-osmosis"></p>

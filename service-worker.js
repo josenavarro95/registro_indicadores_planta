@@ -8,7 +8,7 @@
 // Sube el número de versión (CACHE) cada vez que cambies archivos de la app
 // para que los usuarios reciban la versión nueva en su próxima visita.
 // ============================================================================
-const CACHE = "monitoreo-valdivia-v2";
+const CACHE = "monitoreo-valdivia-v3";
 const ARCHIVOS_APP = [
   "./",
   "./index.html",
@@ -50,21 +50,20 @@ self.addEventListener("fetch", (ev) => {
   // pasar directo a la red, sin interceptar.
   if (ev.request.method !== "GET" || url.origin !== self.location.origin) return;
 
+  // Red primero, de verdad: mientras haya conexión, siempre se pide el
+  // archivo fresco al servidor (y de paso se actualiza la caché) — así,
+  // en cuanto subas un cambio a GitHub, la próxima carga ya lo muestra, sin
+  // quedarse pegado en una versión vieja. Solo si no hay internet se usa lo
+  // que quedó guardado en caché de una visita anterior.
   ev.respondWith(
-    caches.match(ev.request).then((cacheado) => {
-      const redFetch = fetch(ev.request)
-        .then((respuesta) => {
-          if (respuesta && respuesta.ok) {
-            const copia = respuesta.clone();
-            caches.open(CACHE).then((cache) => cache.put(ev.request, copia));
-          }
-          return respuesta;
-        })
-        .catch(() => cacheado); // sin internet: usa lo cacheado si existe
-
-      // Red primero cuando hay conexión (para no quedarse con HTML/JS viejo),
-      // pero responde de inmediato con caché si ya existe y la red tarda.
-      return cacheado || redFetch;
-    })
+    fetch(ev.request)
+      .then((respuesta) => {
+        if (respuesta && respuesta.ok) {
+          const copia = respuesta.clone();
+          caches.open(CACHE).then((cache) => cache.put(ev.request, copia));
+        }
+        return respuesta;
+      })
+      .catch(() => caches.match(ev.request))
   );
 });

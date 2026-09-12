@@ -221,6 +221,14 @@ export const MEDIDORES = [
 // (m0, m1, m2) y el medidor maestro de planta (m3), que se muestran aparte.
 export const MEDIDORES_AREA_IDS = ["m4", "m5", "m6", "m7", "m8", "m9", "m10", "m11", "m12", "m13", "m14", "m15", "m16"];
 
+// Medidores que YA se están registrando por hora (coincide con los campos
+// visibles del formulario de Registro — ver index.html). El resto de
+// MEDIDORES existe en el sistema pero todavía no llega ningún dato, así que
+// el dashboard los deja fuera de las gráficas para no confundir con series
+// vacías o en cero. Único lugar que hay que tocar cuando se active un
+// medidor nuevo (además de quitarle "hidden" a su campo en index.html).
+export const MEDIDORES_ACTIVOS_IDS = ["m1", "m3", "m4", "m5", "m7", "m8", "m9", "m16"];
+
 export function calcularMedidores({ medidores }, anterior) {
   const lecturas = medidores || {};
   const anteriores = anterior?.medidores || {};
