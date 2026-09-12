@@ -262,8 +262,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 }
 .dashboard-toolbar label { min-width: 150px; }
 
-.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
-@media (max-width: 860px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+/* auto-fit en vez de un número fijo de columnas: así, si más adelante se
+   agrega o quita alguna tarjeta de KPI, se acomodan solas sin dejar huecos
+   ni tener que tocar el CSS de nuevo. */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 24px; }
 .kpi-card {
   background: linear-gradient(160deg, var(--bg-card), #101827);
   border: 1px solid var(--border);

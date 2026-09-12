@@ -121,12 +121,19 @@ function totalPorTurno(registros, ids) {
 function renderKPIs(registros) {
   const totalEnergiaKwh = registros.reduce((a, r) => a + Math.max(0, r.energia?.energiaConsumidaKwh || 0), 0);
   const demandaMaximaKw = registros.reduce((a, r) => Math.max(a, r.energia?.potenciaTotalKw || 0), 0);
-  const totalAguaM3 = registros.reduce((a, r) => a + Math.max(0, r.agua?.consumoM3 || 0), 0);
+  // OJO: esto es la cisterna de agua POTABLE (nivelCisternaPct) — un sistema
+  // totalmente aparte de los 17 medidores M0-M16 (agua de proceso/planta). No
+  // tiene por qué coincidir con el consumo de ninguna área ni con M3: son dos
+  // redes de agua distintas. Para el consumo de PLANTA usa kpi-agua-planta
+  // (medidor maestro M3) o la gráfica "Consumo de agua por área".
+  const totalAguaCisternaM3 = registros.reduce((a, r) => a + Math.max(0, r.agua?.consumoM3 || 0), 0);
+  const totalAguaPlantaM3 = registros.reduce((a, r) => a + Math.max(0, r.medidores?.m3?.consumoM3 || 0), 0);
   const totalGlpKg = registros.reduce((a, r) => a + Math.max(0, r.glp?.consumoKgHora || 0), 0);
 
   document.getElementById("kpi-energia").textContent = registros.length ? `${fmt(totalEnergiaKwh, 0)} kWh` : "—";
   document.getElementById("kpi-demanda").textContent = registros.length ? `${fmt(demandaMaximaKw, 1)} kW` : "—";
-  document.getElementById("kpi-agua").textContent = registros.length ? `${fmt(totalAguaM3, 2)} m³` : "—";
+  document.getElementById("kpi-agua").textContent = registros.length ? `${fmt(totalAguaCisternaM3, 2)} m³` : "—";
+  document.getElementById("kpi-agua-planta").textContent = registros.length ? `${fmt(totalAguaPlantaM3, 2)} m³` : "—";
   document.getElementById("kpi-glp").textContent = registros.length ? `${fmt(totalGlpKg, 1)} kg` : "—";
 }
 
