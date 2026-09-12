@@ -82,6 +82,10 @@
             </label>
           </div>
           <p class="muted small">La energía suministrada es la lectura del medidor totalizador (solo sube) — el consumo de la hora se calcula solo, como diferencia con la lectura anterior.</p>
+          <label class="checkbox-inline">
+            <input type="checkbox" name="energiaSinRestar" />
+            Esta lectura no se puede comparar con la anterior (ej. primera lectura de un contador nuevo, o la hora siguiente a esa primera lectura) — no calcular el consumo de esta hora.
+          </label>
         </fieldset>
 
         <fieldset>
