@@ -54,17 +54,36 @@ function estadistica(valores) {
   return { media, desv: Math.sqrt(varianza), min: Math.min(...v), max: Math.max(...v) };
 }
 
-function etiqueta(r) {
-  return `${r.hora}\n${fmtFecha(r.fecha)}`;
+// Etiquetas del eje X: SOLO la hora en cada punto (ej. "10:00"). La fecha no
+// se repite en las 24 etiquetas de un mismo día (antes salía "10:00
+// 11/09/2026" en cada una, ilegible) — en vez de eso, se muestra una sola vez,
+// en dos líneas, justo en el primer punto de cada día nuevo, a modo de
+// separador visual entre días. La fecha exacta de cualquier punto siempre
+// se puede ver también al pasar el mouse (ver tooltipCompleto).
+function etiquetasEje(registros) {
+  let fechaAnterior = null;
+  return registros.map((r) => {
+    if (r.fecha !== fechaAnterior) {
+      fechaAnterior = r.fecha;
+      return [r.hora, fmtFecha(r.fecha)]; // array = Chart.js lo dibuja en 2 líneas
+    }
+    return r.hora;
+  });
 }
 
-// Callback de tooltip compartido: además del valor, muestra a qué turno
-// pertenece esa hora — así se puede leer directamente en la gráfica en qué
-// turno se está consumiendo más, sin tener que memorizar los rangos de hora.
-function tooltipConTurno(registros) {
+// Callback de tooltip compartido: además del valor, muestra siempre la fecha
+// completa y el turno al pasar el mouse — así la fecha no depende de si esa
+// etiqueta del eje X la mostraba o no, y de paso se ve directamente en qué
+// turno se está consumiendo más.
+function tooltipCompleto(registros) {
   return {
     ...opcionesBase.plugins.tooltip,
-    callbacks: { afterTitle: (items) => `Turno: ${registros[items[0].dataIndex]?.turno || "—"}` },
+    callbacks: {
+      afterTitle: (items) => {
+        const r = registros[items[0]?.dataIndex];
+        return r ? `${fmtFecha(r.fecha)} · ${r.turno}` : "";
+      },
+    },
   };
 }
 
@@ -157,7 +176,7 @@ function lineaUmbral(valor, etiquetas, texto) {
 // Energía
 // ---------------------------------------------------------------------------
 function renderEnergia(registros) {
-  const etiquetas = registros.map(etiqueta);
+  const etiquetas = etiquetasEje(registros);
   const potencia = registros.map((r) => r.energia?.potenciaTotalKw ?? null);
   const energiaKwh = registros.map((r) => r.energia?.energiaConsumidaKwh ?? null);
 
@@ -169,7 +188,11 @@ function renderEnergia(registros) {
         { type: "line", label: "Potencia total (kW)", data: potencia, borderColor: PALETA.potencia, backgroundColor: "transparent", tension: 0.3, pointRadius: 2, yAxisID: "y" },
       ],
     },
-    options: { ...opcionesBase, scales: { ...opcionesBase.scales, y: { ...opcionesBase.scales.y, title: { display: true, text: "kW / kWh", color: "#8ea0b4" } } } },
+    options: {
+      ...opcionesBase,
+      plugins: { ...opcionesBase.plugins, tooltip: tooltipCompleto(registros) },
+      scales: { ...opcionesBase.scales, y: { ...opcionesBase.scales.y, title: { display: true, text: "kW / kWh", color: "#8ea0b4" } } },
+    },
   });
 
   const st = estadistica(potencia);
@@ -193,7 +216,7 @@ function renderEnergia(registros) {
 // Agua / cisterna
 // ---------------------------------------------------------------------------
 function renderAgua(registros) {
-  const etiquetas = registros.map(etiqueta);
+  const etiquetas = etiquetasEje(registros);
   const nivel = registros.map((r) => r.agua?.nivelPct ?? null);
   const volumen = registros.map((r) => r.agua?.volumenM3 ?? null);
   const umbral = PARAMETROS.cisterna.umbralBajoPct;
@@ -207,7 +230,11 @@ function renderAgua(registros) {
         lineaUmbral(umbral, etiquetas, `Umbral bajo (${umbral}%)`),
       ],
     },
-    options: { ...opcionesBase, scales: { ...opcionesBase.scales, y: { ...opcionesBase.scales.y, min: 0, max: 100, title: { display: true, text: "% de llenado", color: "#8ea0b4" } } } },
+    options: {
+      ...opcionesBase,
+      plugins: { ...opcionesBase.plugins, tooltip: tooltipCompleto(registros) },
+      scales: { ...opcionesBase.scales, y: { ...opcionesBase.scales.y, min: 0, max: 100, title: { display: true, text: "% de llenado", color: "#8ea0b4" } } },
+    },
   });
 
   const ultimoNivel = nivel[nivel.length - 1];
@@ -228,7 +255,7 @@ function renderAgua(registros) {
 // Medidores de agua por área (M4-M16) — ranking de consumo del periodo
 // ---------------------------------------------------------------------------
 function renderMedidoresAreas(registros) {
-  const etiquetas = registros.map(etiqueta);
+  const etiquetas = etiquetasEje(registros);
 
   // Solo se dibuja una línea por cada área que YA tiene dato real — así se
   // ve el patrón de subida/bajada hora a hora de cada una, en vez de mezclar
@@ -259,7 +286,7 @@ function renderMedidoresAreas(registros) {
     },
     options: {
       ...opcionesBase,
-      plugins: { ...opcionesBase.plugins, tooltip: tooltipConTurno(registros) },
+      plugins: { ...opcionesBase.plugins, tooltip: tooltipCompleto(registros) },
       scales: { ...opcionesBase.scales, y: { ...opcionesBase.scales.y, title: { display: true, text: "m³ consumidos por hora", color: "#8ea0b4" } } },
     },
   });
@@ -296,7 +323,7 @@ function renderMedidoresAreas(registros) {
 // Tratamiento de agua — ósmosis (M0 entrada, M1 producto, M2 rechazo)
 // ---------------------------------------------------------------------------
 function renderOsmosis(registros) {
-  const etiquetas = registros.map(etiqueta);
+  const etiquetas = etiquetasEje(registros);
 
   // Solo se dibuja el medidor del tren de ósmosis que ya tiene dato real
   // (por ahora M1 · Producto). M0 y M2 se suman solos en cuanto se activen
@@ -324,7 +351,7 @@ function renderOsmosis(registros) {
     },
     options: {
       ...opcionesBase,
-      plugins: { ...opcionesBase.plugins, tooltip: tooltipConTurno(registros) },
+      plugins: { ...opcionesBase.plugins, tooltip: tooltipCompleto(registros) },
       scales: { ...opcionesBase.scales, y: { ...opcionesBase.scales.y, title: { display: true, text: "m³ por hora", color: "#8ea0b4" } } },
     },
   });
@@ -362,7 +389,7 @@ function renderOsmosis(registros) {
 // GLP — total del banco + detalle por tanque
 // ---------------------------------------------------------------------------
 function renderGlp(registros) {
-  const etiquetas = registros.map(etiqueta);
+  const etiquetas = etiquetasEje(registros);
   const pctTotal = registros.map((r) => r.glp?.pctTotal ?? null);
   const masaTotal = registros.map((r) => r.glp?.masaTotalKg ?? null);
   const umbral = PARAMETROS.glp.umbralBajoPct;
@@ -376,7 +403,11 @@ function renderGlp(registros) {
         lineaUmbral(umbral, etiquetas, `Umbral bajo (${umbral}%)`),
       ],
     },
-    options: { ...opcionesBase, scales: { ...opcionesBase.scales, y: { ...opcionesBase.scales.y, min: 0, max: 100, title: { display: true, text: "% del banco (6 tanques)", color: "#8ea0b4" } } } },
+    options: {
+      ...opcionesBase,
+      plugins: { ...opcionesBase.plugins, tooltip: tooltipCompleto(registros) },
+      scales: { ...opcionesBase.scales, y: { ...opcionesBase.scales.y, min: 0, max: 100, title: { display: true, text: "% del banco (6 tanques)", color: "#8ea0b4" } } },
+    },
   });
 
   const coloresTanques = [PALETA.l1, PALETA.l2, PALETA.l3, PALETA.potencia, PALETA.glp, PALETA.agua];
@@ -393,7 +424,11 @@ function renderGlp(registros) {
         borderWidth: 1.5,
       })),
     },
-    options: { ...opcionesBase, scales: { ...opcionesBase.scales, y: { ...opcionesBase.scales.y, min: 0, max: 100, title: { display: true, text: "% nivel por tanque", color: "#8ea0b4" } } } },
+    options: {
+      ...opcionesBase,
+      plugins: { ...opcionesBase.plugins, tooltip: tooltipCompleto(registros) },
+      scales: { ...opcionesBase.scales, y: { ...opcionesBase.scales.y, min: 0, max: 100, title: { display: true, text: "% nivel por tanque", color: "#8ea0b4" } } },
+    },
   });
 
   const ultimoPct = pctTotal[pctTotal.length - 1];
