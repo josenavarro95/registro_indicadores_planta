@@ -28,41 +28,37 @@ export const PARAMETROS = {
   },
   glp: {
     numTanques: 6,
-    capacidadVolumetricaL: 7500, // por tanque, placa de fabricante
-    capacidadMasaKg: 4050, // por tanque, a densidad 0.54 kg/L
+    capacidadVolumetricaL: 7500, // por tanque, confirmado en la placa ASME (VOLUMEN: 7 500 L)
+    capacidadMasaKg: 4050, // por tanque, a densidad 0.54 kg/L (7500 L x 0.54)
     densidadKgL: 0.54,
-    factorPsiAKgCm2: 0.070307, // conversión exacta PSI -> kg/cm²
     // Umbral de alerta por nivel bajo (% de llenado, sobre masa total del banco)
     umbralBajoPct: 15,
   },
 };
 
 // ---------------------------------------------------------------------------
-// SUPUESTO DE CÁLCULO — GLP (léase antes de usar en producción)
+// CÁLCULO DE GLP — confirmado con foto de la placa del manómetro (12/09/2026)
 // ---------------------------------------------------------------------------
-// El Excel de referencia trae, por cada uno de los 6 tanques, una lectura de
-// "Presión GLP en campo (PSI)" que en los datos reales se mueve en un rango
-// estrecho (58–85) y decrece de forma gradual y monótona turno a turno — el
-// comportamiento típico de un indicador de NIVEL, no de presión de vapor real
-// (la presión de vapor de una mezcla GLP depende sobre todo de la temperatura
-// ambiente y no cae así de forma continua con el consumo).
+// Los 6 tanques usan un medidor Rochester "LIQUID LEVEL GAUGE FOR LP-GAS"
+// (flotador magnético, dial 0-100% de capacidad total) — NO es un manómetro
+// de presión, aunque en el Excel de referencia y en planta se lo llame
+// "presión (PSI)" por costumbre. La placa lo dice explícito ("PORCENTAJE DE
+// CAPACIDAD TOTAL") y coincide con el comportamiento ya observado en los
+// datos reales: cada tanque baja gradual e independiente de los demás, con
+// saltos puntuales de recarga — si fuera presión de vapor real, los 6
+// tanques subirían y bajarían juntos seguiendo la temperatura ambiente del
+// día, no el consumo de cada uno.
 //
-// Por eso, para este prototipo, se asume que el manómetro/transmisor de cada
-// tanque está calibrado en una escala 0–100 que se lee directamente como
-// PORCENTAJE DE LLENADO (aunque la etiqueta de campo diga "PSI"), es decir:
-//     nivelPct = clamp(psi, 0, 100)
+// Por eso el campo se lee directo como PORCENTAJE DE LLENADO:
+//     nivelPct = clamp(lectura, 0, 100)
 //     masaKg   = nivelPct/100 * capacidadMasaKg
 //     volumenL = nivelPct/100 * capacidadVolumetricaL
-// El campo kg/cm² SÍ es una conversión física real (PSI x 0.070307) y se
-// muestra solo como referencia de presión, no se usa para calcular masa.
-//
-// Esto es un supuesto de ingeniería para poder avanzar con el prototipo.
-// Cuando tengas la curva de calibración real del transmisor (PSI a 0% y PSI
-// a 100% de cada tanque), reemplaza `nivelPctDesdePsi()` por la interpolación
-// lineal correcta — es el único punto que hay que tocar.
-function nivelPctDesdePsi(psi) {
-  if (psi === null || psi === undefined || Number.isNaN(psi)) return null;
-  return Math.min(100, Math.max(0, psi));
+// Ya no se calcula ni se guarda una conversión a kg/cm² -- no tendría sentido
+// físico convertir un % de nivel usando el factor PSI->kg/cm², y el dato
+// nunca se mostraba en el dashboard.
+function nivelPctDesdePsi(lectura) {
+  if (lectura === null || lectura === undefined || Number.isNaN(lectura)) return null;
+  return Math.min(100, Math.max(0, lectura));
 }
 
 // ---------------------------------------------------------------------------
@@ -100,12 +96,17 @@ function numOrNull(v) {
   return v === null || v === undefined || v === "" || Number.isNaN(Number(v)) ? null : Number(v);
 }
 
-export function calcularEnergia({ potenciaTotalKw, energiaSuminGwh }, anterior) {
+export function calcularEnergia({ potenciaTotalKw, energiaSuminGwh, energiaSinRestar }, anterior) {
   const potencia = numOrNull(potenciaTotalKw);
   const acumuladoGwh = numOrNull(energiaSuminGwh);
 
   let energiaConsumidaKwh = null;
-  if (acumuladoGwh !== null && anterior && typeof anterior.energia?.energiaSuminGwh === "number") {
+  // energiaSinRestar: casilla "esta lectura no se puede comparar con la
+  // anterior" (por ejemplo, la primera lectura real de un contador nuevo, o
+  // justo la hora siguiente a esa primera lectura, cuando el valor de
+  // arranque no era exacto) — evita restar y guardar un consumo inventado
+  // que después aparece como un pico gigante en la gráfica.
+  if (!energiaSinRestar && acumuladoGwh !== null && anterior && typeof anterior.energia?.energiaSuminGwh === "number") {
     const deltaGwh = acumuladoGwh - anterior.energia.energiaSuminGwh;
     energiaConsumidaKwh = round2(deltaGwh * 1_000_000); // 1 GWh = 1,000,000 kWh
   }
@@ -116,6 +117,7 @@ export function calcularEnergia({ potenciaTotalKw, energiaSuminGwh }, anterior) 
     potenciaTotalKw: potencia === null ? null : round2(potencia),
     energiaSuminGwh: acumuladoGwh === null ? null : round6(acumuladoGwh), // GWh necesita varios decimales: 1 kWh = 0.000001 GWh
     energiaConsumidaKwh,
+    sinRestar: !!energiaSinRestar,
   };
 }
 
@@ -149,13 +151,16 @@ export function calcularGlp({ glpPsi }, anterior) {
   const psis = (glpPsi || []).slice(0, PARAMETROS.glp.numTanques);
   while (psis.length < PARAMETROS.glp.numTanques) psis.push(null);
 
+  // Nota: el campo interno se sigue llamando "psi" (y así queda guardado en
+  // Firestore) por compatibilidad con todo el histórico ya registrado, pero
+  // desde el 12/09/2026 se confirmó que es una LECTURA DE NIVEL (%), no una
+  // presión real -- ver el comentario arriba de nivelPctDesdePsi().
   const tanques = psis.map((psiRaw, idx) => {
     const psi = psiRaw === null || psiRaw === undefined || psiRaw === "" ? null : Number(psiRaw);
-    const kgcm2 = psi === null ? null : round3(psi * PARAMETROS.glp.factorPsiAKgCm2);
     const nivelPct = nivelPctDesdePsi(psi);
     const masaKg = nivelPct === null ? null : round2((nivelPct / 100) * PARAMETROS.glp.capacidadMasaKg);
     const volumenL = nivelPct === null ? null : round2((nivelPct / 100) * PARAMETROS.glp.capacidadVolumetricaL);
-    return { numero: idx + 1, psi, kgcm2, nivelPct: nivelPct === null ? null : round2(nivelPct), masaKg, volumenL };
+    return { numero: idx + 1, psi, nivelPct: nivelPct === null ? null : round2(nivelPct), masaKg, volumenL };
   });
 
   const psisValidos = tanques.map((t) => t.psi).filter((v) => v !== null);
@@ -163,7 +168,6 @@ export function calcularGlp({ glpPsi }, anterior) {
   const volumenesValidos = tanques.map((t) => t.volumenL).filter((v) => v !== null);
 
   const promPsi = psisValidos.length ? round2(promedio(psisValidos)) : null;
-  const promKgcm2 = promPsi === null ? null : round3(promPsi * PARAMETROS.glp.factorPsiAKgCm2);
   const masaTotalKg = masasValidas.length ? round2(masasValidas.reduce((a, b) => a + b, 0)) : null;
   const volumenTotalL = volumenesValidos.length ? round2(volumenesValidos.reduce((a, b) => a + b, 0)) : null;
   const capacidadTotalKg = PARAMETROS.glp.numTanques * PARAMETROS.glp.capacidadMasaKg;
@@ -175,7 +179,7 @@ export function calcularGlp({ glpPsi }, anterior) {
     consumoKgHora = round2(anterior.glp.masaTotalKg - masaTotalKg);
   }
 
-  return { tanques, promPsi, promKgcm2, masaTotalKg, volumenTotalL, pctTotal, capacidadTotalKg, consumoKgHora };
+  return { tanques, promPsi, masaTotalKg, volumenTotalL, pctTotal, capacidadTotalKg, consumoKgHora };
 }
 
 function promedio(valores) {

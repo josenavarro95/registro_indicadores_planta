@@ -107,6 +107,7 @@ async function cargarHoraEnFormulario(hora) {
     const d = snap.data();
     form.potenciaTotalKw.value = d.energia?.potenciaTotalKw ?? "";
     form.energiaSuminGwh.value = d.energia?.energiaSuminGwh ?? "";
+    form.energiaSinRestar.checked = !!d.energia?.sinRestar;
     form.estado.value = d.estado ?? "OK";
     form.operador.value = d.operador ?? "";
     form.nivelCisternaPct.value = d.agua?.nivelPct ?? "";
@@ -148,6 +149,7 @@ function limpiarCampos() {
     if (form[nombre]) form[nombre].value = "";
   });
   form.estado.value = "OK";
+  form.energiaSinRestar.checked = false;
 }
 
 function enfocarPrimerCampo() {
@@ -233,6 +235,7 @@ async function guardarRegistro(ev) {
     operador: form.operador.value.trim(),
     potenciaTotalKw: numOrNull(form.potenciaTotalKw.value),
     energiaSuminGwh: numOrNull(form.energiaSuminGwh.value),
+    energiaSinRestar: form.energiaSinRestar.checked,
     nivelCisternaPct: numOrNull(form.nivelCisternaPct.value),
     glpPsi: [1, 2, 3, 4, 5, 6].map((i) => numOrNull(form[`glp${i}`].value)),
     medidores,

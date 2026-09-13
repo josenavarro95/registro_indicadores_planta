@@ -399,7 +399,32 @@ function renderGlp(registros) {
   const etiquetas = etiquetasEje(registros);
   const pctTotal = registros.map((r) => r.glp?.pctTotal ?? null);
   const masaTotal = registros.map((r) => r.glp?.masaTotalKg ?? null);
+  const consumoKg = registros.map((r) => r.glp?.consumoKgHora ?? null);
   const umbral = PARAMETROS.glp.umbralBajoPct;
+
+  // Consumo de GLP EN KG por hora (lo que se pidió revisar): masa actual del
+  // banco (suma de los 6 tanques, ver calcularGlp en calculos.js) menos la
+  // masa de la hora anterior — mismo principio que energía (kWh) y agua (m³).
+  // Un valor negativo significa recarga de tanques (sube la masa en vez de
+  // bajar), igual convención que en agua/energía.
+  dibujar("chart-glp-kg", {
+    data: {
+      labels: etiquetas,
+      datasets: [
+        { type: "bar", label: "Consumo de GLP (kg/hora)", data: consumoKg, backgroundColor: "#c792ea55", borderColor: PALETA.glp, borderWidth: 1, yAxisID: "y" },
+        { type: "line", label: "Masa total del banco (kg)", data: masaTotal, borderColor: PALETA.l2, backgroundColor: "transparent", tension: 0.3, pointRadius: 2, yAxisID: "y1" },
+      ],
+    },
+    options: {
+      ...opcionesBase,
+      plugins: { ...opcionesBase.plugins, tooltip: tooltipCompleto(registros) },
+      scales: {
+        x: opcionesBase.scales.x,
+        y: { ...opcionesBase.scales.y, title: { display: true, text: "Consumo de GLP (kg/hora)", color: "#8ea0b4" } },
+        y1: { position: "right", ticks: { color: "#8ea0b4" }, grid: { drawOnChartArea: false }, title: { display: true, text: "Masa total del banco (kg)", color: "#8ea0b4" } },
+      },
+    },
+  });
 
   dibujar("chart-glp-total", {
     type: "line",
@@ -457,7 +482,7 @@ function renderGlp(registros) {
   }
   document.getElementById("diag-glp").textContent = diag;
   document.getElementById("nota-glp-supuesto").textContent =
-    "Nota: el % de cada tanque se calcula asumiendo que el transmisor de campo entrega directamente el nivel (0–100) en su lectura de \"PSI\". Ver comentario en calculos.js si se dispone de la curva de calibración real.";
+    "Nota: los 6 tanques usan manómetro Rochester de nivel (flotador magnético, dial 0-100% de capacidad) — no miden presión real, aunque en planta se los siga llamando \"PSI\" por costumbre.";
 }
 
 // ---------------------------------------------------------------------------

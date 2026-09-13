@@ -124,7 +124,7 @@
         </fieldset>
 
         <fieldset>
-          <legend>GLP — presión de campo por tanque (PSI)</legend>
+          <legend>GLP — nivel de campo por tanque (%)</legend>
           <div class="field-row field-row--glp">
             <label>Tanque 1 <input type="number" step="any" name="glp1" /></label>
             <label>Tanque 2 <input type="number" step="any" name="glp2" /></label>
@@ -158,7 +158,7 @@
         <ul class="lista-parametros">
           <li>Cisterna: 1.9 × 4.3 × 6.7 m (≈55 m³ nominal)</li>
           <li>Tanque GLP: 7 500 L / 4 050 kg c/u — 6 tanques</li>
-          <li>Conversión: 1 PSI = 0.070307 kg/cm²</li>
+          <li>Manómetros: medidor de nivel Rochester (flotador magnético para LP-GAS), dial 0-100% de capacidad — no son manómetros de presión</li>
           <li>17 medidores de agua definidos (M0-M16), todos totalizadores — 8 activos por ahora (M1, M3, M4, M5, M7, M8, M9, M16)</li>
         </ul>
       </aside>
@@ -235,8 +235,9 @@
     <div class="chart-card">
       <div class="chart-card__header">
         <h2>GLP — banco de 6 tanques</h2>
-        <p class="muted">Nivel total del banco (%) y detalle individual por tanque, con umbral de alerta y autonomía estimada.</p>
+        <p class="muted">Consumo real cada hora en kg (barra) y masa total del banco en kg (línea), calculado como la diferencia entre la masa acumulada de la hora anterior y la actual — igual principio que la energía y el agua. Debajo, el nivel del banco en % y el detalle por tanque.</p>
       </div>
+      <div class="chart-wrap"><canvas id="chart-glp-kg"></canvas></div>
       <div class="chart-wrap"><canvas id="chart-glp-total"></canvas></div>
       <div class="chart-wrap"><canvas id="chart-glp-tanques"></canvas></div>
       <p class="diagnostico" id="diag-glp"></p>

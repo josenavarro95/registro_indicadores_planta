@@ -131,6 +131,16 @@ legend {
 .field-row--medidores { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 @media (max-width: 640px) { .field-row--medidores { grid-template-columns: 1fr; } }
 
+.checkbox-inline {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.checkbox-inline input[type="checkbox"] { width: 16px; height: 16px; margin-top: 2px; accent-color: var(--accent); flex-shrink: 0; }
+
 label {
   display: flex;
   flex-direction: column;
