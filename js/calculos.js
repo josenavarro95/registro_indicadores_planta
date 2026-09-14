@@ -24,7 +24,7 @@ export const PARAMETROS = {
     },
     capacidadNominalM3: 55,
     // Umbral de alerta por nivel bajo (% de llenado)
-    umbralBajoPct: 20,
+    umbralBajoPct: 40,
   },
   glp: {
     numTanques: 6,
