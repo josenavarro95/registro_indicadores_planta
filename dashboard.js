@@ -87,6 +87,20 @@ function tooltipCompleto(registros) {
   };
 }
 
+// Igual que tooltipCompleto, pero además avisa cuando el punto bajo el mouse
+// es una recarga detectada (ver datasetsTanques en renderGlp) — solo lo usa
+// el gráfico de detalle por tanque.
+function tooltipConRecargas(registros) {
+  const base = tooltipCompleto(registros);
+  return {
+    ...base,
+    callbacks: {
+      ...base.callbacks,
+      afterLabel: (item) => (item.dataset._recargas?.[item.dataIndex] ? "⬆ Recarga detectada en este tanque" : undefined),
+    },
+  };
+}
+
 // Describe en una frase cómo se comportó una serie horaria: promedio, y en
 // qué hora/turno estuvo el pico y el valle — para poder decir "sube en tal
 // turno, baja en tal otro" sin tener que leer los 24-72 puntos uno a uno.
@@ -399,43 +413,78 @@ function renderGlp(registros) {
   const etiquetas = etiquetasEje(registros);
   const pctTotal = registros.map((r) => r.glp?.pctTotal ?? null);
   const masaTotal = registros.map((r) => r.glp?.masaTotalKg ?? null);
+  const consumoKg = registros.map((r) => r.glp?.consumoKgHora ?? null);
   const umbral = PARAMETROS.glp.umbralBajoPct;
 
-  dibujar("chart-glp-total", {
-    type: "line",
+  // Consumo de GLP EN KG por hora (lo que se pidió revisar): masa actual del
+  // banco (suma de los 6 tanques, ver calcularGlp en calculos.js) menos la
+  // masa de la hora anterior — mismo principio que energía (kWh) y agua (m³).
+  // Un valor negativo significa recarga de tanques (sube la masa en vez de
+  // bajar), igual convención que en agua/energía.
+  dibujar("chart-glp-kg", {
     data: {
       labels: etiquetas,
       datasets: [
-        { label: "GLP banco (%)", data: pctTotal, borderColor: PALETA.glp, backgroundColor: "#c792ea33", fill: true, tension: 0.3, pointRadius: 1.5 },
-        lineaUmbral(umbral, etiquetas, `Umbral bajo (${umbral}%)`),
+        { type: "bar", label: "Consumo de GLP (kg/hora)", data: consumoKg, backgroundColor: "#c792ea55", borderColor: PALETA.glp, borderWidth: 1, yAxisID: "y" },
+        { type: "line", label: "Masa total del banco (kg)", data: masaTotal, borderColor: PALETA.l2, backgroundColor: "transparent", tension: 0.3, pointRadius: 2, yAxisID: "y1" },
       ],
     },
     options: {
       ...opcionesBase,
       plugins: { ...opcionesBase.plugins, tooltip: tooltipCompleto(registros) },
-      scales: { ...opcionesBase.scales, y: { ...opcionesBase.scales.y, min: 0, max: 100, title: { display: true, text: "% del banco (6 tanques)", color: "#8ea0b4" } } },
+      scales: {
+        x: opcionesBase.scales.x,
+        y: { ...opcionesBase.scales.y, title: { display: true, text: "Consumo de GLP (kg/hora)", color: "#8ea0b4" } },
+        y1: { position: "right", ticks: { color: "#8ea0b4" }, grid: { drawOnChartArea: false }, title: { display: true, text: "Masa total del banco (kg)", color: "#8ea0b4" } },
+      },
     },
   });
 
+  // Gráfico de "% del banco" (suma de los 6 tanques) eliminado a pedido de
+  // José — no aportaba nada para identificar recargas, ya que mezclaba los 6
+  // tanques en un solo número. En su lugar, el detalle por tanque de abajo
+  // ahora marca en rojo el punto exacto (tanque + hora) donde se detecta una
+  // recarga, comparando cada lectura contra la hora anterior del MISMO tanque.
+  const UMBRAL_RECARGA_PCT = 2; // salto mínimo entre horas consecutivas para no confundir ruido de sensor con una recarga real
+
   const coloresTanques = [PALETA.l1, PALETA.l2, PALETA.l3, PALETA.potencia, PALETA.glp, PALETA.agua];
+  const datasetsTanques = [1, 2, 3, 4, 5, 6].map((n, i) => {
+    const datos = registros.map((r) => r.glp?.tanques?.[i]?.nivelPct ?? null);
+    const recargas = datos.map((v, j) => {
+      const prev = j > 0 ? datos[j - 1] : null;
+      return typeof v === "number" && typeof prev === "number" && v - prev > UMBRAL_RECARGA_PCT;
+    });
+    return {
+      label: `Tanque ${n}`,
+      data: datos,
+      borderColor: coloresTanques[i],
+      backgroundColor: "transparent",
+      tension: 0.3,
+      pointRadius: datos.map((_, j) => (recargas[j] ? 5 : 1)),
+      pointBackgroundColor: datos.map((_, j) => (recargas[j] ? PALETA.umbral : coloresTanques[i])),
+      pointBorderColor: datos.map((_, j) => (recargas[j] ? PALETA.umbral : coloresTanques[i])),
+      borderWidth: 1.5,
+      _recargas: recargas, // usado solo por el tooltip de este gráfico, no lo dibuja Chart.js
+    };
+  });
+
   dibujar("chart-glp-tanques", {
     type: "line",
-    data: {
-      labels: etiquetas,
-      datasets: [1, 2, 3, 4, 5, 6].map((n, i) => ({
-        label: `Tanque ${n}`,
-        data: registros.map((r) => r.glp?.tanques?.[i]?.nivelPct ?? null),
-        borderColor: coloresTanques[i],
-        tension: 0.3,
-        pointRadius: 1,
-        borderWidth: 1.5,
-      })),
-    },
+    data: { labels: etiquetas, datasets: datasetsTanques },
     options: {
       ...opcionesBase,
-      plugins: { ...opcionesBase.plugins, tooltip: tooltipCompleto(registros) },
-      scales: { ...opcionesBase.scales, y: { ...opcionesBase.scales.y, min: 0, max: 100, title: { display: true, text: "% nivel por tanque", color: "#8ea0b4" } } },
+      plugins: { ...opcionesBase.plugins, tooltip: tooltipConRecargas(registros) },
+      scales: { ...opcionesBase.scales, y: { ...opcionesBase.scales.y, min: 0, max: 100, title: { display: true, text: "% nivel por tanque (punto rojo = recarga)", color: "#8ea0b4" } } },
     },
+  });
+
+  // Lista legible de las recargas detectadas en el periodo, para el texto de
+  // diagnóstico (además de verse marcadas en el gráfico de arriba).
+  const eventosRecarga = [];
+  datasetsTanques.forEach((ds, i) => {
+    ds._recargas.forEach((esRecarga, j) => {
+      if (esRecarga) eventosRecarga.push(`Tanque ${i + 1} (${fmtFecha(registros[j].fecha)} ${registros[j].hora})`);
+    });
   });
 
   const ultimoPct = pctTotal[pctTotal.length - 1];
@@ -453,11 +502,12 @@ function renderGlp(registros) {
         ? `⚠ Nivel del banco de GLP en ${fmt(ultimoPct)}% (${fmt(ultimaMasa, 0)} kg de ${fmt(PARAMETROS.glp.numTanques * PARAMETROS.glp.capacidadMasaKg, 0)} kg) — por debajo del umbral de ${umbral}%. Coordinar recarga.`
         : `✓ Nivel del banco de GLP en ${fmt(ultimoPct)}% (${fmt(ultimaMasa, 0)} kg de ${fmt(PARAMETROS.glp.numTanques * PARAMETROS.glp.capacidadMasaKg, 0)} kg).`;
     const autonomia = autonomiaDias ? ` Autonomía estimada al ritmo actual: ${fmt(autonomiaDias, 1)} días.` : "";
-    diag = base + autonomia;
+    const recargasTexto = eventosRecarga.length ? ` Recargas detectadas en el periodo: ${eventosRecarga.join(", ")}.` : "";
+    diag = base + autonomia + recargasTexto;
   }
   document.getElementById("diag-glp").textContent = diag;
   document.getElementById("nota-glp-supuesto").textContent =
-    "Nota: el % de cada tanque se calcula asumiendo que el transmisor de campo entrega directamente el nivel (0–100) en su lectura de \"PSI\". Ver comentario en calculos.js si se dispone de la curva de calibración real.";
+    "Nota: los 6 tanques usan manómetro Rochester de nivel (flotador magnético, dial 0-100% de capacidad) — no miden presión real, aunque en planta se los siga llamando \"PSI\" por costumbre.";
 }
 
 // ---------------------------------------------------------------------------

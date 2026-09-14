@@ -8,7 +8,7 @@
 // Sube el número de versión (CACHE) cada vez que cambies archivos de la app
 // para que los usuarios reciban la versión nueva en su próxima visita.
 // ============================================================================
-const CACHE = "monitoreo-valdivia-v6";
+const CACHE = "monitoreo-valdivia-v7";
 const ARCHIVOS_APP = [
   "./",
   "./index.html",
