@@ -35,6 +35,10 @@ body {
   color: var(--text);
   font-family: var(--font);
   line-height: 1.5;
+  /* Salvavidas: si algún gráfico o tabla llegara a ser más ancho que la
+     pantalla, que no arrastre a toda la página a desplazarse de lado — cada
+     gráfico ya tiene su propio ancho responsivo (ver .chart-wrap). */
+  overflow-x: hidden;
 }
 
 h1, h2, h3 { margin: 0; font-weight: 600; }
@@ -56,7 +60,7 @@ h1, h2, h3 { margin: 0; font-weight: 600; }
   top: 0;
   z-index: 10;
 }
-.topbar__brand { display: flex; align-items: center; gap: 12px; }
+.topbar__brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .topbar__dot {
   width: 12px; height: 12px; border-radius: 50%;
   background: var(--accent-2);
@@ -77,9 +81,29 @@ h1, h2, h3 { margin: 0; font-weight: 600; }
   font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 .tab:hover { color: var(--text); border-color: var(--accent); }
 .tab--active { background: var(--accent); color: #06121c; border-color: var(--accent); font-weight: 600; }
+
+/* ---------- Topbar compacto en celular ----------
+   En pantallas angostas, el título largo + subtítulo + pestañas hacían que
+   la barra superior (que queda fija arriba, "position: sticky") ocupara casi
+   media pantalla del celular, dejando muy poco espacio para ver los gráficos
+   del dashboard debajo. Aquí se achica todo (título en una sola línea más
+   chico, subtítulo más chico, pestañas más angostas) para que la barra fija
+   ocupe lo mínimo posible y el resto de la pantalla quede libre. */
+@media (max-width: 640px) {
+  .topbar { padding: 10px 14px; gap: 8px; }
+  .topbar__dot { width: 9px; height: 9px; }
+  .topbar h1 { font-size: 0.86rem; line-height: 1.25; }
+  .topbar p { font-size: 0.72rem; }
+  .tabs { gap: 6px; width: 100%; }
+  .tab { padding: 7px 12px; font-size: 0.76rem; flex: 1 1 auto; text-align: center; }
+}
+@media (max-width: 400px) {
+  .topbar h1 { font-size: 0.78rem; }
+}
 
 /* ---------- Layout ---------- */
 main { max-width: 1180px; margin: 0 auto; padding: 24px 20px 60px; }
@@ -301,6 +325,12 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 
 .chart-wrap { position: relative; height: 280px; margin-bottom: 8px; }
 .chart-wrap--alto { height: 420px; }
+@media (max-width: 640px) {
+  main { padding: 14px 12px 40px; }
+  .chart-card { padding: 14px; }
+  .chart-wrap { height: 240px; }
+  .chart-wrap--alto { height: 320px; }
+}
 
 .diagnostico {
   font-size: 0.85rem;
