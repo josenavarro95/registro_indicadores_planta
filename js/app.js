@@ -10,7 +10,7 @@
 import { db, doc, setDoc, getDoc, getDocs, query, where, orderBy, limit, lecturasRef, configuracionValida } from "./firebase-init.js";
 import {
   calcularRegistro,
-  turnoDeHora,
+  franjaDeHora,
   horasDelDia,
   fechaHoraOrdenable,
   docIdFechaHora,
@@ -52,7 +52,7 @@ function pintarStrip() {
       const clases = ["chip-hora"];
       if (h === horaSeleccionada) clases.push("chip-hora--active");
       else if (horasGuardadasDelDia.has(h)) clases.push("chip-hora--done");
-      return `<button type="button" class="${clases.join(" ")}" data-hora="${h}" title="${turnoDeHora(h)}">${h.slice(0, 2)}</button>`;
+      return `<button type="button" class="${clases.join(" ")}" data-hora="${h}" title="${franjaDeHora(h)}">${h.slice(0, 2)}</button>`;
     })
     .join("");
   resumenDia.textContent = `${horasGuardadasDelDia.size} de 24 horas registradas`;
@@ -86,8 +86,8 @@ function primeraHoraPendiente() {
 // ---------------------------------------------------------------------------
 async function cargarHoraEnFormulario(hora) {
   horaSeleccionada = hora;
-  inputHoraActual.value = `${hora}  ·  ${turnoDeHora(hora)}`;
-  badgeTurno.textContent = turnoDeHora(hora);
+  inputHoraActual.value = `${hora}  ·  ${franjaDeHora(hora)}`;
+  badgeTurno.textContent = franjaDeHora(hora);
   pintarStrip();
 
   const fecha = inputFecha.value;

@@ -76,9 +76,10 @@ npx serve .
 - **Registro de Lectura**: pensado para llenarse rápido y sin usar el mouse.
   Eliges el **día** una sola vez; abajo aparece una franja con las 24 horas
   (gris = pendiente, verde = ya registrada, azul = la que estás llenando). Al
-  entrar, la app salta sola a la primera hora sin datos. El turno se calcula
-  solo según los 3 turnos reales de la planta (Noche 19:00–00:00, Madrugada
-  01:00–08:00, Día/Tarde 09:00–18:00). Escribe un valor y presiona **Enter**
+  entrar, la app salta sola a la primera hora sin datos. La franja horaria se
+  calcula sola según 3 bloques iguales de 8h (00:00–08:00, 08:00–16:00,
+  16:00–00:00) — no son los turnos reales de personal (esos son solo 2), es
+  solo una forma de agrupar el consumo por tramo del día. Escribe un valor y presiona **Enter**
   para saltar al siguiente campo (Potencia total → Energía suministrada →
   % cisterna → los 17 medidores de agua M0-M16 → los 6 PSI de GLP →
   operador); al presionar Enter en el último campo se guarda solo. Después de
@@ -149,15 +150,18 @@ Revísalos — son fáciles de ajustar, están aislados en `js/calculos.js`:
   que tocar.
 - **Cisterna**: 1.9 × 4.3 × 6.7 m = 54.79 m³ (redondeas a 55 m³ nominal),
   dimensiones que me diste directamente.
-- **Día operativo vs. día calendario**: la planta arma su reporte con un
-  "día de planta" que arranca a las 19:00 (Turno 1) y cruza medianoche hasta
-  las 18:00 del día siguiente. El prototipo, para simplicidad, guarda cada
-  lectura con su **fecha calendario real** y hora — el orden cronológico
+- **Franjas horarias (antes "turnos")**: desde el 14/09/2026 el día se divide
+  en 3 bloques IGUALES de 8h (00:00-08:00, 08:00-16:00, 16:00-00:00) — ver
+  `FRANJAS_HORARIAS` en `calculos.js`. No son los turnos reales de personal
+  (esos son solo 2); es solo una forma de agrupar y comparar el consumo por
+  tramo del día en el dashboard. El campo sigue llamándose `"turno"` en
+  Firestore por compatibilidad con todo el histórico ya guardado, pero su
+  valor ahora es la franja horaria.
+- **Día operativo vs. día calendario**: el prototipo, para simplicidad, guarda
+  cada lectura con su **fecha calendario real** y hora — el orden cronológico
   (para calcular consumos como diferencia con la lectura anterior) es
   correcto y cruza la medianoche sin problema, pero el filtro del dashboard
-  agrupa "por fecha calendario", no "por día de planta". Si prefieres que el
-  dashboard también agrupe por turno de 19:00 a 18:00, lo ajustamos en una
-  siguiente iteración.
+  agrupa "por fecha calendario", no por un día operativo distinto.
 - **Reglas de Firestore abiertas**: decidiste dejarlas así para probar rápido
   (ver sección 1). Recuerda cerrarlas antes de un uso más amplio.
 - **Recuperación de ósmosis "típica" (40-75%)**: es una referencia general de
@@ -172,7 +176,7 @@ Colección `lecturas`, un documento por hora con ID `AAAA-MM-DD_HHMM`, por ejemp
 
 ```json
 {
-  "fecha": "2026-09-10", "hora": "08:00", "turno": "Turno 2 - Madrugada",
+  "fecha": "2026-09-10", "hora": "08:00", "turno": "Franja 2 (08:00-16:00)",
   "estado": "OK", "operador": "...",
   "energia": { "potenciaTotalKw": 305.6, "energiaSuminGwh": 12.483217, "energiaConsumidaKwh": 305.6 },
   "agua": { "nivelPct": 47.37, "alturaM": 0.9, "volumenM3": 25.95, "consumoM3": -3.16 },

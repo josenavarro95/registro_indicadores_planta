@@ -62,18 +62,23 @@ function nivelPctDesdePsi(lectura) {
 }
 
 // ---------------------------------------------------------------------------
-// Turnos operativos (horarios reales tomados del Excel: 6 + 8 + 10 = 24 h)
+// Franjas horarias (12/09/2026: reemplazan a los "turnos" que había antes).
+// En planta hay solo 2 turnos reales de personal, así que llamarlo "turno"
+// en el sistema confundía -- esto es simplemente el día partido en 3 bloques
+// IGUALES de 8 horas cada uno (00:00-08:00, 08:00-16:00, 16:00-00:00; suman
+// las 24 h del día) para poder agrupar y comparar el consumo por tramo
+// horario, sin que se preste a confusión con los turnos de trabajo reales.
 // ---------------------------------------------------------------------------
-export const TURNOS = [
-  { id: "T1", nombre: "Turno 1 - Noche", horas: [19, 20, 21, 22, 23, 0] },
-  { id: "T2", nombre: "Turno 2 - Madrugada", horas: [1, 2, 3, 4, 5, 6, 7, 8] },
-  { id: "T3", nombre: "Turno 3 - Día/Tarde", horas: [9, 10, 11, 12, 13, 14, 15, 16, 17, 18] },
+export const FRANJAS_HORARIAS = [
+  { id: "F1", nombre: "Franja 1 (00:00-08:00)", horas: [0, 1, 2, 3, 4, 5, 6, 7] },
+  { id: "F2", nombre: "Franja 2 (08:00-16:00)", horas: [8, 9, 10, 11, 12, 13, 14, 15] },
+  { id: "F3", nombre: "Franja 3 (16:00-00:00)", horas: [16, 17, 18, 19, 20, 21, 22, 23] },
 ];
 
-export function turnoDeHora(horaStr) {
+export function franjaDeHora(horaStr) {
   const h = parseInt(String(horaStr).split(":")[0], 10);
-  const turno = TURNOS.find((t) => t.horas.includes(h));
-  return turno ? turno.nombre : "Sin turno";
+  const franja = FRANJAS_HORARIAS.find((f) => f.horas.includes(h));
+  return franja ? franja.nombre : "Sin franja";
 }
 
 export function horasDelDia() {
@@ -261,7 +266,10 @@ export function calcularRegistro(input, anterior = null) {
   return {
     fecha: input.fecha,
     hora: input.hora,
-    turno: turnoDeHora(input.hora),
+    // El campo se sigue llamando "turno" en Firestore por compatibilidad con
+    // todo el histórico ya guardado, pero desde el 14/09/2026 su valor es la
+    // franja horaria de 8h (ver franjaDeHora arriba), no un turno de personal.
+    turno: franjaDeHora(input.hora),
     estado: input.estado || "OK",
     operador: input.operador || "",
     energia: calcularEnergia(input, anterior),

@@ -72,9 +72,9 @@ function etiquetasEje(registros) {
 }
 
 // Callback de tooltip compartido: además del valor, muestra siempre la fecha
-// completa y el turno al pasar el mouse — así la fecha no depende de si esa
-// etiqueta del eje X la mostraba o no, y de paso se ve directamente en qué
-// turno se está consumiendo más.
+// completa y la franja horaria al pasar el mouse — así la fecha no depende de
+// si esa etiqueta del eje X la mostraba o no, y de paso se ve directamente en
+// qué franja horaria se está consumiendo más.
 function tooltipCompleto(registros) {
   return {
     ...opcionesBase.plugins.tooltip,
@@ -102,8 +102,10 @@ function tooltipConRecargas(registros) {
 }
 
 // Describe en una frase cómo se comportó una serie horaria: promedio, y en
-// qué hora/turno estuvo el pico y el valle — para poder decir "sube en tal
-// turno, baja en tal otro" sin tener que leer los 24-72 puntos uno a uno.
+// qué hora/franja horaria estuvo el pico y el valle — para poder decir "sube
+// en tal franja, baja en tal otra" sin tener que leer los 24-72 puntos uno a
+// uno. Nota: "franja horaria" = bloque de 8h (00-08 / 08-16 / 16-00), no un
+// turno de personal — ver FRANJAS_HORARIAS en calculos.js.
 function describirPatronHorario(registros, valorFn, nombre) {
   const puntos = registros.map((r) => ({ v: valorFn(r), r })).filter((p) => typeof p.v === "number" && !Number.isNaN(p.v));
   if (!puntos.length) return `Sin datos suficientes de ${nombre} para diagnóstico.`;
@@ -111,22 +113,22 @@ function describirPatronHorario(registros, valorFn, nombre) {
   const pico = puntos.reduce((a, p) => (p.v > a.v ? p : a));
   const valle = puntos.reduce((a, p) => (p.v < a.v ? p : a));
   return (
-    `${nombre}: promedio ${fmt(media)} m³/h en el periodo. Sube más en el turno "${pico.r.turno}" ` +
-    `— pico de ${fmt(pico.v)} m³/h a las ${pico.r.hora} del ${fmtFecha(pico.r.fecha)} — y baja más en el turno "${valle.r.turno}" ` +
+    `${nombre}: promedio ${fmt(media)} m³/h en el periodo. Sube más en la franja horaria "${pico.r.turno}" ` +
+    `— pico de ${fmt(pico.v)} m³/h a las ${pico.r.hora} del ${fmtFecha(pico.r.fecha)} — y baja más en la franja horaria "${valle.r.turno}" ` +
     `— mínimo de ${fmt(valle.v)} m³/h a las ${valle.r.hora} del ${fmtFecha(valle.r.fecha)}.`
   );
 }
 
-// Suma, por turno, el consumo horario total de un conjunto de medidores —
-// para responder directamente "¿en qué turno se consume más?" a nivel
-// agregado (no solo de una serie individual).
-function totalPorTurno(registros, ids) {
+// Suma, por franja horaria, el consumo horario total de un conjunto de
+// medidores — para responder directamente "¿en qué franja horaria se
+// consume más?" a nivel agregado (no solo de una serie individual).
+function totalPorFranja(registros, ids) {
   const totales = {};
   registros.forEach((r) => {
     const consumoHora = ids.reduce((a, id) => a + Math.max(0, r.medidores?.[id]?.consumoM3 || 0), 0);
     totales[r.turno] = (totales[r.turno] || 0) + consumoHora;
   });
-  return Object.entries(totales).sort((a, b) => b[1] - a[1]); // [ [turno, total], ... ] de mayor a menor
+  return Object.entries(totales).sort((a, b) => b[1] - a[1]); // [ [franja, total], ... ] de mayor a menor
 }
 
 // ---------------------------------------------------------------------------
@@ -324,10 +326,10 @@ function renderMedidoresAreas(registros) {
     const pctTop = (top.total / totalAreas) * 100;
     diag = `El área con mayor consumo del periodo es "${top.nombre}" (${fmt(top.total, 1)} m³ — ${fmt(pctTop, 0)}% del total medido por las áreas registradas).`;
 
-    const rankingTurnos = totalPorTurno(registros, AREAS_ACTIVAS_IDS);
-    if (rankingTurnos.length) {
-      const [turnoTop, totalTurnoTop] = rankingTurnos[0];
-      diag += ` El turno con mayor consumo acumulado entre estas áreas es "${turnoTop}" (${fmt(totalTurnoTop, 1)} m³) — en la gráfica se ve en qué tramo de horas sube.`;
+    const rankingFranjas = totalPorFranja(registros, AREAS_ACTIVAS_IDS);
+    if (rankingFranjas.length) {
+      const [franjaTop, totalFranjaTop] = rankingFranjas[0];
+      diag += ` La franja horaria con mayor consumo acumulado entre estas áreas es "${franjaTop}" (${fmt(totalFranjaTop, 1)} m³) — en la gráfica se ve en qué tramo de horas sube.`;
     }
     if (totalPlanta > 0) {
       const diferenciaPct = ((totalAreas - totalPlanta) / totalPlanta) * 100;
@@ -398,7 +400,7 @@ function renderOsmosis(registros) {
     }
   } else if (hayProducto) {
     // Solo M1 activo: en vez del % de recuperación (necesita M0/M2), se
-    // describe el patrón de subida/bajada por hora y turno.
+    // describe el patrón de subida/bajada por hora y franja horaria.
     diag =
       describirPatronHorario(registros, (r) => r.medidores?.m1?.consumoM3 ?? null, "M1 · Producto ósmosis") +
       " (M0 y M2 todavía no se registran — en cuanto tengan datos, aquí se calculará el % de recuperación real.)";
